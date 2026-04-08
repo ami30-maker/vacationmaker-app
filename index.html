@@ -3,28 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Italia 2026 Planner</title>
+    <title>Trip Planner</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
+    <div id="overlay" onclick="toggleMenu()"></div>
+    <aside id="sidebar">
+        <button class="close-btn" onclick="toggleMenu()">✕</button>
+        <h2>Trip Settings</h2>
+        <label>Start Date:</label>
+        <input type="date" id="trip-start" onchange="updateTripDates()">
+        <label>End Date:</label>
+        <input type="date" id="trip-end" onchange="updateTripDates()">
+        <hr>
+        <button class="nav-btn" onclick="switchPage('itinerary')">🗺️ Daily Itinerary</button>
+        <button class="nav-btn" onclick="switchPage('budget')">💰 Finances & Budget</button>
+        <button class="nav-btn" onclick="switchPage('packing')">🎒 Packing List</button>
+    </aside>
+
     <header>
-        <h1 id="page-title">🗺️ Itinerary</h1>
-    </header>
+        <button class="hamburger" onclick="toggleMenu()">☰</button>
+        <h1 id="page-title">Trip Planner</h1>
+        <div style="width: 30px;"></div> </header>
 
     <main id="app-content">
         </main>
 
-    <nav class="bottom-nav">
-        <button onclick="switchPage('itinerary')">🗺️<br>Daily</button>
-        <button onclick="switchPage('budget')">💰<br>Budget</button>
-        <button onclick="switchPage('packing')">🎒<br>Packing</button>
-    </nav>
-
     <script src="app.js"></script>
     <script>
-        // Register the Service Worker for offline use
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js');
         }
