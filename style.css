@@ -1,18 +1,35 @@
 body {
   font-family: Arial;
-  padding: 20px;
+  padding: 15px;
   text-align: center;
 }
 
-input {
-  padding: 10px;
-  width: 60%;
+.tabs {
+  margin-bottom: 20px;
 }
 
 button {
   padding: 10px;
+  margin: 5px;
+}
+
+input, textarea {
+  padding: 10px;
+  margin: 5px;
+  width: 80%;
+}
+
+.hidden {
+  display: none;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
 }
 
 li {
   margin: 10px 0;
+  padding: 10px;
+  border: 1px solid #ccc;
 }

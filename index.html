@@ -12,12 +12,35 @@
 
   <h1>🌍 Travel Planner</h1>
 
-  <div>
-    <input id="itemInput" placeholder="Add item..." />
-    <button onclick="addItem()">Add</button>
+  <div class="tabs">
+    <button onclick="showTab('packing')">Packing</button>
+    <button onclick="showTab('itinerary')">Itinerary</button>
+    <button onclick="showTab('notes')">Notes</button>
   </div>
 
-  <ul id="list"></ul>
+  <!-- Packing -->
+  <div id="packing" class="tab">
+    <h2>Packing List</h2>
+    <input id="packingInput" placeholder="Add item..." />
+    <button onclick="addPacking()">Add</button>
+    <ul id="packingList"></ul>
+  </div>
+
+  <!-- Itinerary -->
+  <div id="itinerary" class="tab hidden">
+    <h2>Itinerary</h2>
+    <input id="time" placeholder="Time (e.g. 9:00 AM)">
+    <input id="event" placeholder="Event">
+    <input id="location" placeholder="Location">
+    <button onclick="addEvent()">Add</button>
+    <ul id="itineraryList"></ul>
+  </div>
+
+  <!-- Notes -->
+  <div id="notes" class="tab hidden">
+    <h2>Notes</h2>
+    <textarea id="notesArea" placeholder="Write notes..."></textarea>
+  </div>
 
   <script src="app.js"></script>
 </body>
