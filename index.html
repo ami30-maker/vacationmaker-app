@@ -1,243 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Italia 2026 Planner</title>
-<link rel="icon" href="https://upload.wikimedia.org/wikipedia/commons/0/03/Flag_of_Italy.svg">
-<style>
-/* ----- Fonts & Global ----- */
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap');
-body { font-family: 'Nunito', sans-serif; margin:0; padding:0; background:#f4f7f6; color:#2b2b2b; }
-.container { max-width:1000px; margin:auto; padding:1rem; }
-h1 { font-weight:800; color:#1a1a1a; text-align:center; font-size:2.5rem; margin-bottom:0.5rem; }
-.subtitle { font-size:1.1rem; color:#e63946; text-align:center; font-style:italic; margin-bottom:20px; font-weight:600; }
-
-/* ----- Tabs ----- */
-.tabs { display:flex; justify-content:center; margin-bottom:1rem; }
-.tab { padding:10px 20px; margin:0 5px; cursor:pointer; border-radius:8px; font-weight:700; background:#fff; border:1px solid #ccc; transition:0.2s; }
-.tab.active { background:#e63946; color:#fff; border-color:#e63946; }
-
-/* ----- Cards ----- */
-.lodging-card, .activity-card { border-radius:12px; padding:15px; margin-bottom:15px; box-shadow:0 4px 6px rgba(0,0,0,0.05); background:white; }
-.lodging-card { border-left:5px solid #457b9d; }
-.activity-card { display:flex; align-items:center; transition: transform 0.2s; border:1px solid #eef2f5; }
-.activity-card:hover { transform:translateY(-2px); box-shadow:0 6px 12px rgba(0,0,0,0.08); }
-.time-text { font-weight:800; color:#e63946; margin-bottom:2px; display:block; }
-.event-title { font-size:1.2rem; font-weight:700; margin:0; }
-.ticket-badge { background:#f4a261; color:white; padding:2px 8px; border-radius:12px; font-weight:700; font-size:0.75rem; margin-left:8px; }
-.notes-text { color:#6c757d; font-size:0.9rem; margin-top:4px; line-height:1.3; }
-.map-btn { background:#e3f2fd; color:#1e88e5; padding:6px 12px; border-radius:8px; text-decoration:none; font-weight:700; font-size:0.9rem; border:1px solid #bbdefb; margin-left:5px; }
-.map-btn:hover { background:#bbdefb; color:#1565c0; }
-button { border-radius:8px; padding:6px 12px; font-weight:600; cursor:pointer; transition:0.2s; }
-button:hover { background:#f1f3f5; color:#e63946; border-color:#e63946; }
-input[type="text"], input[type="number"], select, textarea { padding:6px; margin:3px 0; border-radius:6px; border:1px solid #ccc; width:100%; }
-.flex { display:flex; gap:10px; flex-wrap:wrap; }
-.flex > div { flex:1; min-width:150px; }
-.hidden { display:none; }
-.activity-form, .ticket-item { border:1px dashed #ccc; padding:8px; margin-bottom:8px; border-radius:8px; background:#fafafa; }
-.activity-form button, .ticket-item button { margin-top:4px; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Italia 2026 Planner</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
-<div class="container">
-<h1>Italia 2026 Planner</h1>
-<p class="subtitle" id="page-subtitle">Plan your trip, budget, and packing!</p>
+    <header>
+        <h1 id="page-title">🗺️ Itinerary</h1>
+    </header>
 
-<!-- Tabs -->
-<div class="tabs">
-<div class="tab active" data-tab="itinerary">🗺️ Daily Itinerary</div>
-<div class="tab" data-tab="budget">💰 Finances & Budget</div>
-<div class="tab" data-tab="packing">🎒 Packing List</div>
-</div>
+    <main id="app-content">
+        </main>
 
-<!-- Content -->
-<div id="itinerary-tab">
-    <div class="flex" style="justify-content:space-between; margin-bottom:10px;">
-        <button id="prev-day">⬅️ PREV DAY</button>
-        <div id="current-day" style="font-weight:700;"></div>
-        <button id="next-day">NEXT DAY ➡️</button>
-    </div>
+    <nav class="bottom-nav">
+        <button onclick="switchPage('itinerary')">🗺️<br>Daily</button>
+        <button onclick="switchPage('budget')">💰<br>Budget</button>
+        <button onclick="switchPage('packing')">🎒<br>Packing</button>
+    </nav>
 
-    <div id="lodging-section"><h3>🏨 Lodging</h3></div>
-    <div id="activities-section"><h3>🏃 Activities</h3></div>
-    <div id="budget-section"><h3>💶 Daily Expenses</h3></div>
-    <div id="ticket-section"><h3>🎫 Ticket Vault</h3></div>
-</div>
-
-<div id="budget-tab" class="hidden">
-    <h2>💰 Trip Financial Summary</h2>
-    <div id="budget-summary"></div>
-</div>
-
-<div id="packing-tab" class="hidden">
-    <h2>🎒 Packing Lists</h2>
-    <div style="display:flex; gap:10px;">
-        <div>
-            <input type="text" id="new-traveler" placeholder="Add Traveler">
-            <button id="add-traveler">Create Profile</button>
-        </div>
-        <div>
-            <select id="select-traveler"><option>--</option></select>
-        </div>
-    </div>
-    <input type="file" id="csv-upload" accept=".csv">
-    <div id="traveler-items"></div>
-</div>
-</div>
-
-<script>
-// ----- Data Engine -----
-let tripData = JSON.parse(localStorage.getItem("tripData")) || {itinerary:{}, packing:{}};
-let today = new Date(2026,4,4), end=new Date(2026,4,20), days=[];
-for(let d=new Date(today); d<=end; d.setDate(d.getDate()+1)) days.push(new Date(d));
-let currentDayIdx = 0;
-
-// ----- Tabs -----
-document.querySelectorAll('.tab').forEach(tab=>{
-    tab.addEventListener('click',()=>{
-        document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-        tab.classList.add('active');
-        document.querySelectorAll('#itinerary-tab, #budget-tab, #packing-tab').forEach(c=>c.classList.add('hidden'));
-        if(tab.dataset.tab==='itinerary') renderDay();
-        if(tab.dataset.tab==='budget'){ document.getElementById('budget-tab').classList.remove('hidden'); renderBudgetSummary(); }
-        if(tab.dataset.tab==='packing'){ document.getElementById('packing-tab').classList.remove('hidden'); renderPacking(); }
-    });
-});
-
-// ----- Day Navigation -----
-document.getElementById('prev-day').addEventListener('click',()=>{currentDayIdx=Math.max(0,currentDayIdx-1); renderDay();});
-document.getElementById('next-day').addEventListener('click',()=>{currentDayIdx=Math.min(days.length-1,currentDayIdx+1); renderDay();});
-
-function renderDay(){
-    document.getElementById('itinerary-tab').classList.remove('hidden');
-    let selDate=days[currentDayIdx], dayKey=selDate.toISOString().split('T')[0];
-    document.getElementById('current-day').textContent=selDate.toDateString();
-    if(!tripData.itinerary[dayKey]) tripData.itinerary[dayKey]={lodging:[], activities:[], budget:[], tickets:[]};
-
-    // Lodging Section
-    let lHTML='';
-    tripData.itinerary[dayKey].lodging.forEach(l=>{
-        let mapUrl=l.Address?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.Address+' '+l.City+' Italy')}`:'';
-        lHTML+=`<div class="lodging-card"><b>${l.Type}</b> ${l.City}<br>🕐 ${l['Check-in/Check-out']||''}${mapUrl?`<br>📍 <a href='${mapUrl}' target='_blank'>${l.Address}</a>`:''}</div>`;
-    });
-    document.getElementById('lodging-section').innerHTML=`<h3>🏨 Lodging</h3>${lHTML}`;
-
-    // Activities Section
-    let aHTML='';
-    tripData.itinerary[dayKey].activities.forEach((a,i)=>{
-        let mapUrl=a.ManualLocation||a.Events?`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((a.ManualLocation||a.Events)+' Italy')}`:'';
-        aHTML+=`<div class="activity-card">
-            <div style="flex:2">
-                <span class="time-text">${a.Time||''}</span>
-                <span class="event-title">${a.Events||''}</span>
-                ${a.Tickets?`<span class="ticket-badge">🎫 ${a.Tickets}</span>`:''}
-                <div class="notes-text">${a.Notes||''}</div>
-            </div>
-            <div><a href="${mapUrl}" target="_blank" class="map-btn">📍 Map</a></div>
-        </div>`;
-    });
-    aHTML+=`<button onclick="addActivity('${dayKey}')">➕ Add Activity</button>`;
-    document.getElementById('activities-section').innerHTML=`<h3>🏃 Activities</h3>${aHTML}`;
-
-    // Ticket Section
-    let tHTML='';
-    tripData.itinerary[dayKey].tickets.forEach((t,idx)=>{
-        tHTML+=`<div class="ticket-item">
-            <span>${t.name}</span>
-            <button onclick="removeTicket('${dayKey}',${idx})">❌ Remove</button>
-        </div>`;
-    });
-    tHTML+=`<input type="file" id="ticket-upload" onchange="uploadTicket(event,'${dayKey}')">`;
-    document.getElementById('ticket-section').innerHTML=`<h3>🎫 Ticket Vault</h3>${tHTML}`;
-
-    localStorage.setItem("tripData", JSON.stringify(tripData));
-}
-
-// ----- Activity Management -----
-function addActivity(dayKey){
-    let title = prompt("Activity Name:");
-    if(!title) return;
-    let act={Events:title, Time:'', Notes:'', Tickets:'', ManualLocation:''};
-    tripData.itinerary[dayKey].activities.push(act);
-    localStorage.setItem("tripData", JSON.stringify(tripData));
-    renderDay();
-}
-
-// ----- Ticket Management -----
-function uploadTicket(e,dayKey){
-    let file=e.target.files[0];
-    if(!file) return;
-    let reader=new FileReader();
-    reader.onload=function(ev){
-        tripData.itinerary[dayKey].tickets.push({name:file.name, data:ev.target.result});
-        localStorage.setItem("tripData", JSON.stringify(tripData));
-        renderDay();
-    }
-    reader.readAsDataURL(file);
-}
-function removeTicket(dayKey,idx){
-    tripData.itinerary[dayKey].tickets.splice(idx,1);
-    localStorage.setItem("tripData", JSON.stringify(tripData));
-    renderDay();
-}
-
-// ----- Budget -----
-function renderBudgetSummary(){
-    let html='', total=0;
-    for(let d in tripData.itinerary){
-        tripData.itinerary[d].budget.forEach(b=>{total+=parseFloat(b.Amount||0);});
-    }
-    html+=`<h3>Total Spent: €${total.toFixed(2)}</h3>`;
-    document.getElementById('budget-summary').innerHTML=html;
-}
-
-// ----- Packing -----
-function renderPacking(){
-    let select=document.getElementById('select-traveler');
-    select.innerHTML='<option>--</option>';
-    for(let t in tripData.packing) select.innerHTML+=`<option>${t}</option>`;
-    let container=document.getElementById('traveler-items'); container.innerHTML='';
-    let sel=select.value;
-    if(sel && tripData.packing[sel]){
-        tripData.packing[sel].items.forEach((item,i)=>{
-            container.innerHTML+=`<div><input type="checkbox" onchange="toggleItem('${sel}',${i})" ${item.checked?'checked':''}> ${item.name}</div>`;
-        });
-    }
-}
-
-document.getElementById('add-traveler').addEventListener('click',()=>{
-    let name=document.getElementById('new-traveler').value.trim();
-    if(!name) return;
-    tripData.packing[name]={items:[]};
-    localStorage.setItem("tripData", JSON.stringify(tripData));
-    renderPacking();
-});
-
-function toggleItem(traveler,idx){
-    let sel=traveler, item=tripData.packing[sel].items[idx];
-    item.checked=!item.checked;
-    localStorage.setItem("tripData", JSON.stringify(tripData));
-}
-
-// CSV Upload
-document.getElementById('csv-upload').addEventListener('change',(e)=>{
-    let file=e.target.files[0];
-    if(!file) return;
-    let reader=new FileReader();
-    reader.onload=function(ev){
-        let rows=ev.target.result.split(/\r?\n/).filter(r=>r.trim());
-        let sel=document.getElementById('select-traveler').value;
-        if(sel && tripData.packing[sel]){
-            rows.forEach(r=>tripData.packing[sel].items.push({name:r, checked:false}));
-            localStorage.setItem("tripData", JSON.stringify(tripData));
-            renderPacking();
+    <script src="app.js"></script>
+    <script>
+        // Register the Service Worker for offline use
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js');
         }
-    }
-    reader.readAsText(file);
-});
-
-renderDay();
-</script>
+    </script>
 </body>
 </html>

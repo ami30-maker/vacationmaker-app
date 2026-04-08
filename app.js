@@ -1,98 +1,77 @@
-// TAB SWITCHING
-function showTab(tab) {
-  document.querySelectorAll(".tab").forEach(t => t.classList.add("hidden"));
-  document.getElementById(tab).classList.remove("hidden");
+// --- DATA ENGINE (Replaces Python json.dump / load) ---
+const STORAGE_KEY = 'italia_trip_data';
+
+// Default data structure mirroring your Python dict
+let appData = JSON.parse(localStorage.getItem(STORAGE_KEY)) || {
+    itinerary: {
+        "2026-05-04": {
+            subtitle: "Arrival in Rome",
+            activities: [
+                { time: "14:00", title: "Check into Hotel", notes: "Via Roma 123", location: "Rome" },
+                { time: "16:30", title: "Colosseum Tour", notes: "Confirmation #8832", location: "Colosseum Rome" }
+            ],
+            budget: []
+        }
+    },
+    packing: { users: {} }
+};
+
+function saveData() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(appData));
 }
 
-// ------------------ PACKING ------------------
-let packing = JSON.parse(localStorage.getItem("packing")) || [];
-
-function renderPacking() {
-  const list = document.getElementById("packingList");
-  list.innerHTML = "";
-
-  packing.forEach((item, index) => {
-    const li = document.createElement("li");
-    li.textContent = item;
-
-    li.onclick = () => {
-      packing.splice(index, 1);
-      savePacking();
-    };
-
-    list.appendChild(li);
-  });
+// --- HELPER: GOOGLE MAPS LINK ---
+function createMapsLink(query) {
+    if (!query) return "#";
+    const searchUrl = encodeURIComponent(`${query} Italy`);
+    return `https://www.google.com/maps/search/?api=1&query=${searchUrl}`;
 }
 
-function addPacking() {
-  const input = document.getElementById("packingInput");
-  if (!input.value) return;
+// --- RENDERING VIEWS ---
+const contentDiv = document.getElementById('app-content');
+const titleDiv = document.getElementById('page-title');
 
-  packing.push(input.value);
-  input.value = "";
-  savePacking();
+function switchPage(page) {
+    if (page === 'itinerary') renderItinerary();
+    if (page === 'budget') renderBudget();
+    if (page === 'packing') renderPacking();
 }
-
-function savePacking() {
-  localStorage.setItem("packing", JSON.stringify(packing));
-  renderPacking();
-}
-
-// ------------------ ITINERARY ------------------
-let itinerary = JSON.parse(localStorage.getItem("itinerary")) || [];
 
 function renderItinerary() {
-  const list = document.getElementById("itineraryList");
-  list.innerHTML = "";
-
-  itinerary.forEach((item, index) => {
-    const li = document.createElement("li");
-    li.textContent = `${item.time} - ${item.event} (${item.location})`;
-
-    li.onclick = () => {
-      itinerary.splice(index, 1);
-      saveItinerary();
-    };
-
-    list.appendChild(li);
-  });
+    titleDiv.innerText = "🗺️ Daily Itinerary";
+    let html = "";
+    
+    // Loop through dates (For V1, we just display all dates stacked, you can add next/prev later)
+    for (const [date, data] of Object.entries(appData.itinerary)) {
+        html += `<h2>${date}</h2>`;
+        if (data.subtitle) html += `<p style="color:#e63946; font-style:italic;">${data.subtitle}</p>`;
+        
+        // Loop through activities
+        data.activities.forEach(act => {
+            const mapLink = createMapsLink(act.location);
+            html += `
+            <div class='activity-card'>
+                <span class='time-text'>${act.time}</span>
+                <span class='event-title'>${act.title}</span>
+                <div class='notes-text'>${act.notes}</div>
+                <a href="${mapLink}" target="_blank" class="map-btn">📍 View on Map</a>
+            </div>
+            `;
+        });
+    }
+    
+    contentDiv.innerHTML = html;
 }
 
-function addEvent() {
-  const time = document.getElementById("time").value;
-  const event = document.getElementById("event").value;
-  const location = document.getElementById("location").value;
-
-  if (!time || !event) return;
-
-  itinerary.push({ time, event, location });
-
-  document.getElementById("time").value = "";
-  document.getElementById("event").value = "";
-  document.getElementById("location").value = "";
-
-  saveItinerary();
+function renderBudget() {
+    titleDiv.innerText = "💰 Budget";
+    contentDiv.innerHTML = "<p>Budget tracking interface will go here.</p>";
 }
 
-function saveItinerary() {
-  localStorage.setItem("itinerary", JSON.stringify(itinerary));
-  renderItinerary();
+function renderPacking() {
+    titleDiv.innerText = "🎒 Packing List";
+    contentDiv.innerHTML = "<p>Packing checklist will go here.</p>";
 }
 
-// ------------------ NOTES ------------------
-const notesArea = document.getElementById("notesArea");
-
-notesArea.value = localStorage.getItem("notes") || "";
-
-notesArea.addEventListener("input", () => {
-  localStorage.setItem("notes", notesArea.value);
-});
-
-// INIT
-renderPacking();
+// Initialize app on first load
 renderItinerary();
-
-// SERVICE WORKER
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("service-worker.js");
-}

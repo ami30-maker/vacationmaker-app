@@ -1,20 +1,21 @@
-const CACHE_NAME = "travel-app-v1";
-
+const CACHE_NAME = 'italia-planner-v1';
 const urlsToCache = [
-  "/",
-  "/index.html",
-  "/style.css",
-  "/app.js"
+  './index.html',
+  './style.css',
+  './app.js',
+  './manifest.json'
 ];
 
-self.addEventListener("install", event => {
+// Install the Service Worker and cache the files
+self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(urlsToCache))
   );
 });
 
-self.addEventListener("fetch", event => {
+// Serve cached files when offline
+self.addEventListener('fetch', event => {
   event.respondWith(
     caches.match(event.request)
       .then(response => response || fetch(event.request))

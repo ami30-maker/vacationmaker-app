@@ -1,8 +1,15 @@
 {
-  "name": "Travel App",
-  "short_name": "Travel",
-  "start_url": ".",
+  "name": "Italia 2026 Planner",
+  "short_name": "Italia '26",
+  "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#000000"
+  "background_color": "#f4f7f6",
+  "theme_color": "#e63946",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/323/323315.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
 }
