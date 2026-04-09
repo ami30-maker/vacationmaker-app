@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vacationmaker-app-v2';
+const CACHE_NAME = 'vacationmaker-app-v3';
 const urlsToCache = [
   './index.html',
   './style.css',
