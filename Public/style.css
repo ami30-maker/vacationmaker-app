@@ -1,0 +1,99 @@
+:root {
+    --bg-color: #f4f5f7;
+    --card-bg: #ffffff;
+    --text-main: #1c1c1e;
+    --text-muted: #8e8e93;
+    --accent: #007aff; /* iOS Blue */
+    --accent-hover: #005bb5;
+    
+    /* Time of Day Colors */
+    --morning: #eef7ff; /* Light Blue */
+    --afternoon: #fff8e1; /* Light Orange */
+    --evening: #f3e5f5; /* Light Purple */
+}
+
+html, body { 
+    font-family: 'Inter', sans-serif; 
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    margin: 0; padding: 0;
+    overflow-x: hidden;
+}
+
+/* Header & Typography */
+header {
+    background: var(--card-bg);
+    padding: 15px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 10px rgba(0,0,0,0.05);
+    position: sticky;
+    top: 0; z-index: 100;
+}
+h1 { margin: 0; font-size: 1.4rem; font-weight: 700; }
+.hamburger { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--accent); }
+
+main { padding: 20px; max-width: 600px; margin: 0 auto; padding-bottom: 50px; }
+
+/* Sidebar Navigation */
+#sidebar {
+    position: fixed; top: 0; left: -280px; width: 250px; height: 100%;
+    background: var(--card-bg); box-shadow: 2px 0 12px rgba(0,0,0,0.1);
+    transition: 0.3s ease; z-index: 200; padding: 20px;
+    display: flex; flex-direction: column; gap: 15px;
+}
+#sidebar.open { left: 0; }
+#overlay {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.4); z-index: 150;
+    display: none; opacity: 0; transition: 0.3s;
+}
+#overlay.show { display: block; opacity: 1; }
+.close-btn { align-self: flex-end; background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+.nav-btn { background: var(--bg-color); border: none; padding: 12px; border-radius: 8px; text-align: left; font-weight: 600; font-size: 1rem; cursor: pointer; }
+
+/* Activity Cards (Read Mode) */
+.activity-card {
+    border-radius: 12px; padding: 15px; margin-bottom: 12px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.03);
+    border: 1px solid rgba(0,0,0,0.05);
+    display: grid; gap: 8px;
+}
+.time-morning { background-color: var(--morning); }
+.time-afternoon { background-color: var(--afternoon); }
+.time-evening { background-color: var(--evening); }
+.time-none { background-color: var(--card-bg); }
+
+.card-header { display: flex; justify-content: space-between; align-items: center; }
+.time-text { font-weight: 700; color: var(--text-muted); font-size: 0.9rem; }
+.event-title { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.notes-text { font-size: 0.9rem; color: #4a4a4c; background: rgba(0,0,0,0.03); padding: 8px; border-radius: 6px;}
+
+/* Controls & Inputs */
+input, select, textarea {
+    width: 100%; padding: 10px; margin-top: 5px;
+    border: 1px solid #d1d1d6; border-radius: 8px; font-family: inherit;
+    box-sizing: border-box;
+}
+.primary-btn {
+    background: var(--accent); color: white; border: none; padding: 12px;
+    border-radius: 8px; font-weight: 600; cursor: pointer; width: 100%; margin-top: 10px;
+}
+.primary-btn:hover { background: var(--accent-hover); }
+.flex-row { display: flex; gap: 10px; align-items: center; }
+.controls { display: flex; gap: 10px; }
+.icon-btn { background: none; border: none; font-size: 1.2rem; cursor: pointer; }
+
+/* Table for Edit Mode */
+table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+th, td { border: 1px solid #d1d1d6; padding: 8px; text-align: left; font-size: 0.9rem; }
+th { background: var(--bg-color); }
+.action-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.action-row input, .action-row button { margin-top: 0; }
+.table-input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #d1d1d6; }
+.category-chip { display: inline-flex; align-items: center; gap: 6px; margin: 4px 4px 0 0; padding: 6px 10px; background: #eef2ff; border-radius: 999px; font-size: 0.9rem; }
+.category-chip button { background: none; border: none; color: #ff3b30; cursor: pointer; font-size: 1rem; }
+.clear-btn { background: #ff3b30; color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; width: 100%; margin-top: 10px; }
+.clear-btn:hover { opacity: 0.95; }
+.small-btn { background: #f5f5f7; border: 1px solid #d1d1d6; border-radius: 8px; padding: 10px 14px; cursor: pointer; font-weight: 600; }

@@ -3,15 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Trip Planner</title>
+    <meta name="theme-color" content="#007aff">
+    <meta name="description" content="VacationMaker - Plan your trips collaboratively in real-time">
+    <title>VacationMaker - Trip Planning Made Easy</title>
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot, query, collection, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 
-        // TODO: Replace with your Firebase config
         const firebaseConfig = {
             apiKey: "YOUR_API_KEY",
             authDomain: "YOUR_PROJECT.firebaseapp.com",
@@ -21,48 +24,134 @@
             appId: "YOUR_APP_ID"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
         const db = getFirestore(app);
+        const storage = getStorage(app);
 
         window.firebaseApp = app;
+        window.auth = auth;
         window.db = db;
+        window.storage = storage;
         window.firestoreDoc = doc;
         window.firestoreSetDoc = setDoc;
         window.firestoreGetDoc = getDoc;
         window.firestoreOnSnapshot = onSnapshot;
+        window.firestoreQuery = query;
+        window.firestoreCollection = collection;
+        window.firestoreWhere = where;
+        window.firestoreGetDocs = getDocs;
+        window.storageRef = ref;
+        window.uploadBytes = uploadBytes;
+        window.getDownloadURL = getDownloadURL;
+        window.GoogleAuthProvider = GoogleAuthProvider;
+        window.signInWithPopup = signInWithPopup;
+        window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+        window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+        window.signOut = signOut;
+        window.onAuthStateChanged = onAuthStateChanged;
     </script>
 </head>
 <body>
-    <div id="overlay" onclick="toggleMenu()"></div>
-    <aside id="sidebar">
-        <button class="close-btn" onclick="toggleMenu()">✕</button>
-        <h2>Trip Settings</h2>
-        <label>Trip ID (for sync):</label>
-        <input type="text" id="trip-id" placeholder="Enter shared trip ID" onchange="updateTripId()">
-        <label>Start Date:</label>
-        <input type="date" id="trip-start" onchange="updateTripDates()">
-        <label>End Date:</label>
-        <input type="date" id="trip-end" onchange="updateTripDates()">
-        <hr>
-        <button class="nav-btn" onclick="switchPage('full-itinerary')">📋 Full Itinerary</button>
-        <button class="nav-btn" onclick="switchPage('itinerary')">🗺️ Daily Itinerary</button>
-        <button class="nav-btn" onclick="switchPage('budget')">💰 Finances & Budget</button>
-        <button class="nav-btn" onclick="switchPage('packing')">🎒 Packing List</button>
-        <hr>
-        <button class="nav-btn" onclick="syncApp()">🔄 Sync App</button>
-        <button class="nav-btn" onclick="exportData()">📤 Export Data</button>
-        <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
-        <button class="nav-btn" onclick="document.getElementById('import-file').click()">📥 Import Data</button>
-    </aside>
+    <!-- Auth Screen -->
+    <div id="auth-screen" class="full-screen">
+        <div class="auth-container">
+            <div class="auth-header">
+                <h1>✈️ VacationMaker</h1>
+                <p>Plan trips. Collaborate. Explore.</p>
+            </div>
+            <div id="auth-form-container">
+                <input type="email" id="auth-email" placeholder="Email" />
+                <input type="password" id="auth-password" placeholder="Password" />
+                <button class="primary-btn" onclick="handleSignUp()">Create Account</button>
+                <button class="secondary-btn" onclick="handleSignIn()">Sign In</button>
+                <button class="google-btn" onclick="handleGoogleSignIn()">
+                    <span style="font-size: 1.2rem; margin-right: 8px;">🔐</span> Sign in with Google
+                </button>
+                <p class="auth-footer">Secure cloud sync • Collaborate with friends • Works offline</p>
+            </div>
+            <div id="loading-spinner" class="spinner" style="display:none;"></div>
+        </div>
+    </div>
 
-    <header>
-        <button class="hamburger" onclick="toggleMenu()">☰</button>
-        <h1 id="page-title">Trip Planner</h1>
-        <div style="width: 30px;"></div> </header>
+    <!-- Main App -->
+    <div id="app-screen" style="display:none;">
+        <div id="overlay" onclick="toggleMenu()"></div>
+        
+        <aside id="sidebar">
+            <div class="sidebar-header">
+                <button class="close-btn" onclick="toggleMenu()">✕</button>
+                <h2>VacationMaker</h2>
+            </div>
+            
+            <div class="user-profile">
+                <img id="user-avatar" src="" alt="User" class="avatar-small" />
+                <div>
+                    <p id="user-email" style="margin:0; font-weight:600; font-size:0.9rem;"></p>
+                    <button class="secondary-btn" style="font-size:0.85rem; padding:6px;" onclick="handleLogout()">Logout</button>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <div class="trip-selector">
+                <label><strong>Current Trip</strong></label>
+                <select id="trip-selector" onchange="switchTrip()">
+                    <option value="">No trip selected</option>
+                </select>
+                <button class="primary-btn" style="font-size:0.9rem;" onclick="showNewTripModal()">+ New Trip</button>
+            </div>
+            
+            <div id="trip-controls" style="display:none;">
+                <label>Start Date:</label>
+                <input type="date" id="trip-start" onchange="updateTripDates()">
+                <label>End Date:</label>
+                <input type="date" id="trip-end" onchange="updateTripDates()">
+                
+                <label style="margin-top:15px;"><strong>Share Trip</strong></label>
+                <div class="flex-row" style="gap:5px;">
+                    <input type="text" id="share-email" placeholder="Email to share with" style="flex:1; margin-top:0;">
+                    <button class="primary-btn" style="width:auto; padding:10px;" onclick="shareTrip()">Share</button>
+                </div>
+                <div id="collaborators-list" style="margin-top:10px;"></div>
+                
+                <hr>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-btn" onclick="switchPage('full-itinerary')">📋 Full Itinerary</button>
+                <button class="nav-btn" onclick="switchPage('itinerary')">🗺️ Daily Itinerary</button>
+                <button class="nav-btn" onclick="switchPage('budget')">💰 Budget</button>
+                <button class="nav-btn" onclick="switchPage('packing')">🎒 Packing</button>
+            </nav>
+            
+            <hr>
+            
+            <div class="sidebar-footer">
+                <button class="nav-btn" onclick="syncApp()">🔄 Sync Now</button>
+                <button class="nav-btn" onclick="showSettings()">⚙️ Settings</button>
+            </div>
+        </aside>
 
-    <main id="app-content">
-        </main>
+        <header>
+            <button class="hamburger" onclick="toggleMenu()">☰</button>
+            <h1 id="page-title">Trip Planner</h1>
+            <div class="sync-indicator" id="sync-indicator">✓</div>
+        </header>
+
+        <main id="app-content"></main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal" onclick="closeModal(event)">
+        <div class="modal-content" onclick="event.stopPropagation()">
+            <button class="close-btn" onclick="closeModal()">✕</button>
+            <div id="modal-body"></div>
+        </div>
+    </div>
 
     <script src="app.js"></script>
     <script>
@@ -72,9 +161,7 @@
                     const newWorker = reg.installing;
                     newWorker.addEventListener('statechange', () => {
                         if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            if (confirm('New version available! Reload to update?')) {
-                                window.location.reload();
-                            }
+                            showToast('New version available! Pull down to refresh.', 'info');
                         }
                     });
                 });

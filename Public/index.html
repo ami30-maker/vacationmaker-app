@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Trip Planner</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        // TODO: Replace with your Firebase config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.firebaseApp = app;
+        window.db = db;
+        window.firestoreDoc = doc;
+        window.firestoreSetDoc = setDoc;
+        window.firestoreGetDoc = getDoc;
+        window.firestoreOnSnapshot = onSnapshot;
+    </script>
+</head>
+<body>
+    <div id="overlay" onclick="toggleMenu()"></div>
+    <aside id="sidebar">
+        <button class="close-btn" onclick="toggleMenu()">✕</button>
+        <h2>Trip Settings</h2>
+        <label>Trip ID (for sync):</label>
+        <input type="text" id="trip-id" placeholder="Enter shared trip ID" onchange="updateTripId()">
+        <label>Start Date:</label>
+        <input type="date" id="trip-start" onchange="updateTripDates()">
+        <label>End Date:</label>
+        <input type="date" id="trip-end" onchange="updateTripDates()">
+        <hr>
+        <button class="nav-btn" onclick="switchPage('full-itinerary')">📋 Full Itinerary</button>
+        <button class="nav-btn" onclick="switchPage('itinerary')">🗺️ Daily Itinerary</button>
+        <button class="nav-btn" onclick="switchPage('budget')">💰 Finances & Budget</button>
+        <button class="nav-btn" onclick="switchPage('packing')">🎒 Packing List</button>
+        <hr>
+        <button class="nav-btn" onclick="syncApp()">🔄 Sync App</button>
+        <button class="nav-btn" onclick="exportData()">📤 Export Data</button>
+        <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
+        <button class="nav-btn" onclick="document.getElementById('import-file').click()">📥 Import Data</button>
+    </aside>
+
+    <header>
+        <button class="hamburger" onclick="toggleMenu()">☰</button>
+        <h1 id="page-title">Trip Planner</h1>
+        <div style="width: 30px;"></div> </header>
+
+    <main id="app-content">
+        </main>
+
+    <script src="app.js"></script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js').then(reg => {
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            if (confirm('New version available! Reload to update?')) {
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+            });
+        }
+    </script>
+</body>
+</html>
