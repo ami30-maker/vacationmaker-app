@@ -124,18 +124,12 @@ function parseExcelPaste(text) {
     renderCurrentPage();
 }
 
-function parseTime(str) {
-    str = str.trim().toLowerCase();
-    const match = str.match(/(\d+):?(\d+)?\s*(am|pm)?/);
-    if (match) {
-        let hour = parseInt(match[1]);
-        const min = match[2] ? parseInt(match[2]) : 0;
-        const ampm = match[3];
-        if (ampm === 'pm' && hour < 12) hour += 12;
-        if (ampm === 'am' && hour === 12) hour = 0;
-        return `${hour.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}`;
-    }
-    return str; // fallback
+function formatTime12Hour(time) {
+    if (!time) return 'Anytime';
+    const [hour, min] = time.split(':').map(Number);
+    const ampm = hour >= 12 ? 'PM' : 'AM';
+    const hour12 = hour % 12 || 12;
+    return `${hour12}:${min.toString().padStart(2, '0')} ${ampm}`;
 }
 
 function updateAct(index, field, value) {
@@ -144,11 +138,11 @@ function updateAct(index, field, value) {
     saveData();
 }
 
-function moveAct(index, dir) {
+function moveAnytime(index, dir) {
     const activeDate = getDatesInRange()[appState.currentDateIndex];
     const acts = appState.itinerary[activeDate].activities;
     const newIdx = index + dir;
-    if (newIdx >= 0 && newIdx < acts.length) {
+    if (newIdx >= 0 && newIdx < acts.length && !acts[index].time && !acts[newIdx].time) {
         [acts[index], acts[newIdx]] = [acts[newIdx], acts[index]];
         saveData();
         renderCurrentPage();
@@ -191,8 +185,8 @@ function renderFullItinerary(content) {
         </div>
         <div style="background:#f8f9fa; padding:20px; border-radius:15px; margin-bottom:20px;">
             <h3>Trip Overview</h3>
-            <p><strong>Start Date:</strong> ${new Date(appState.dates.start).toLocaleDateString()}</p>
-            <p><strong>End Date:</strong> ${new Date(appState.dates.end).toLocaleDateString()}</p>
+            <p><strong>Start Date:</strong> ${new Date(appState.dates.start + 'T12:00:00').toLocaleDateString()}</p>
+            <p><strong>End Date:</strong> ${new Date(appState.dates.end + 'T12:00:00').toLocaleDateString()}</p>
             <p><strong>Duration:</strong> ${dates.length} days</p>
         </div>`;
 
@@ -204,6 +198,7 @@ function renderFullItinerary(content) {
             <div class="flex-row" style="justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:10px;">
                 <div>
                     <h3 style="color:#007aff; margin-top:0;">${dateObj.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'})}</h3>
+                    <p style="margin:5px 0; color:#666; font-size:0.9rem;">Daily Schedule</p>
                     ${dayData.header ? `<h4 style="color:#34c759; margin:5px 0 0;">${dayData.header}</h4>` : ''}
                 </div>
                 <button class="small-btn" onclick="switchToDay('${date}')">Edit Day</button>
@@ -214,7 +209,7 @@ function renderFullItinerary(content) {
             if (l && (l.city || l.address)) {
                 const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address || l.city)}`;
                 html += `<div style="background:#f0f0f0; padding:12px; border-radius:10px; margin-bottom:10px;">
-                    <b>${type.toUpperCase()} Lodging:</b> ${l.city || ''} ${l.time ? `(${l.time})` : ''}<br>
+                    <b>${type.toUpperCase()} Lodging:</b> ${l.city || ''} ${l.time ? `(${formatTime12Hour(l.time)})` : ''}<br>
                     ${l.address ? `📍 <a href="${mapUrl}" target="_blank" style="color:#007aff;">${l.address}</a>` : ''}
                 </div>`;
             }
@@ -234,7 +229,7 @@ function renderFullItinerary(content) {
                 html += `<div class="activity-card ${timeClass}" style="margin-bottom:10px;">
                     <div class="card-header">
                         <span class="event-title">${act.event}</span>
-                        <span class="time-text">${act.time || 'Anytime'}</span>
+                        <span class="time-text">${formatTime12Hour(act.time)}</span>
                     </div>
                     ${act.ticket ? `<div style="font-size:0.85rem; margin-top:4px;">🎫 <b>Ticket:</b> ${act.ticket}</div>` : ''}
                     ${act.location ? `<div style="font-size:0.85rem; margin-top:4px;">📍 ${act.location}</div>` : ''}
@@ -438,20 +433,20 @@ function renderItinerary(content) {
             if (l.city || l.address) {
                 const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address || l.city)}`;
                 html += `<div style="background:white; padding:12px; border-radius:10px; margin-bottom:10px; border-left: 5px solid #007aff;">
-                    <b>${type.toUpperCase()}:</b> ${l.city} (${l.time})<br>
+                    <b>${type.toUpperCase()}:</b> ${l.city} (${formatTime12Hour(l.time)})<br>
                     📍 <a href="${mapUrl}" target="_blank" style="color:#007aff; font-size:0.85rem;">${l.address || 'View Map'}</a>
                 </div>`;
             }
         });
 
-        const sortedActivities = [...dayData.activities].sort((a, b) => {
-            if (!a.time && !b.time) return 0;
-            if (!a.time) return 1;
-            if (!b.time) return -1;
-            return a.time.localeCompare(b.time);
-        });
+        const sortedActivities = dayData.activities.map((act, idx) => ({act, idx})).sort((a, b) => {
+            if (!a.act.time && !b.act.time) return 0;
+            if (!a.act.time) return 1;
+            if (!b.act.time) return -1;
+            return a.act.time.localeCompare(b.act.time);
+        }).map(({act, idx}) => ({act, originalIndex: idx}));
 
-        sortedActivities.forEach(act => {
+        sortedActivities.forEach(({act, originalIndex}) => {
             let timeClass = "time-none";
             if (act.time) {
                 const hour = parseInt(act.time.split(':')[0]);
@@ -461,9 +456,12 @@ function renderItinerary(content) {
             }
             const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.location || act.event)}`;
             html += `<div class="activity-card ${timeClass}">
-                <div class="card-header">
-                    <span class="time-text">${act.time || 'Anytime'}</span>
-                    <span class="event-title">${act.event}</span>
+                <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span class="event-title" style="font-weight:bold;">${act.event}</span>
+                    <div style="display:flex; align-items:center; gap:5px;">
+                        ${!act.time ? `<button class="icon-btn" onclick="moveAnytime(${originalIndex}, -1)" style="font-size:0.8rem;">⬆️</button><button class="icon-btn" onclick="moveAnytime(${originalIndex}, 1)" style="font-size:0.8rem;">⬇️</button>` : ''}
+                        <span class="time-text">${formatTime12Hour(act.time)}</span>
+                    </div>
                 </div>
                 ${act.image ? `<img src="${act.image}" style="width:50px; height:50px; margin:5px; border-radius:5px;">` : ''}
                 ${act.ticket ? `<div style="font-size:0.85rem; margin-top:4px;">🎫 <b>Ticket:</b> ${act.ticket}</div>` : ''}
@@ -779,4 +777,50 @@ function removeTicket(index) {
     appState.tickets[activeDate].splice(index, 1);
     saveData();
     renderCurrentPage();
+}
+
+// --- SYNC AND DATA MANAGEMENT ---
+function syncApp() {
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(registrations => {
+            registrations.forEach(registration => registration.unregister());
+        }).then(() => {
+            window.location.reload();
+        });
+    } else {
+        window.location.reload();
+    }
+}
+
+function exportData() {
+    const dataStr = JSON.stringify(appState, null, 2);
+    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'trip-data.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+function importData(input) {
+    const file = input.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const importedState = JSON.parse(e.target.result);
+                appState = importedState;
+                saveData();
+                renderCurrentPage();
+                alert('Data imported successfully!');
+            } catch (err) {
+                alert('Error importing data: ' + err.message);
+            }
+        };
+        reader.readAsText(file);
+    }
+    input.value = '';
 }

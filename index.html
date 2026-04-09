@@ -22,6 +22,11 @@
         <button class="nav-btn" onclick="switchPage('itinerary')">🗺️ Daily Itinerary</button>
         <button class="nav-btn" onclick="switchPage('budget')">💰 Finances & Budget</button>
         <button class="nav-btn" onclick="switchPage('packing')">🎒 Packing List</button>
+        <hr>
+        <button class="nav-btn" onclick="syncApp()">🔄 Sync App</button>
+        <button class="nav-btn" onclick="exportData()">📤 Export Data</button>
+        <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
+        <button class="nav-btn" onclick="document.getElementById('import-file').click()">📥 Import Data</button>
     </aside>
 
     <header>
@@ -35,7 +40,18 @@
     <script src="app.js"></script>
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js');
+            navigator.serviceWorker.register('service-worker.js').then(reg => {
+                reg.addEventListener('updatefound', () => {
+                    const newWorker = reg.installing;
+                    newWorker.addEventListener('statechange', () => {
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            if (confirm('New version available! Reload to update?')) {
+                                window.location.reload();
+                            }
+                        }
+                    });
+                });
+            });
         }
     </script>
 </body>
