@@ -34,21 +34,7 @@ function loadData() {
     req.onsuccess = () => {
         if (req.result) appState = req.result.state;
         renderCurrentPage();
-        updateDateInputs();
     };
-}
-
-function updateDateInputs() {
-    document.getElementById('trip-start').value = appState.dates.start;
-    document.getElementById('trip-end').value = appState.dates.end;
-}
-
-function updateTripDates() {
-    appState.dates.start = document.getElementById('trip-start').value;
-    appState.dates.end = document.getElementById('trip-end').value;
-    appState.currentDateIndex = 0; // reset to first day
-    saveData();
-    renderCurrentPage();
 }
 
 // --- NAVIGATION ---
@@ -141,12 +127,12 @@ function removeAct(index) {
 function renderCurrentPage() {
     const content = document.getElementById('app-content');
     const title = document.getElementById('page-title');
-    if (appState.currentPage === 'itinerary') {
-        title.innerText = "🗺️ Itinerary";
-        renderItinerary(content);
-    } else if (appState.currentPage === 'full-itinerary') {
+    if (appState.currentPage === 'full-itinerary') {
         title.innerText = "📋 Full Itinerary";
         renderFullItinerary(content);
+    } else if (appState.currentPage === 'itinerary') {
+        title.innerText = "🗺️ Itinerary";
+        renderItinerary(content);
     } else if (appState.currentPage === 'budget') {
         title.innerText = "💰 Finances";
         renderBudget(content);
@@ -156,7 +142,158 @@ function renderCurrentPage() {
     }
 }
 
-function getDatesInRange() {
+function renderFullItinerary(content) {
+    const dates = getDatesInRange();
+    const hasItinerary = Object.keys(appState.itinerary).some(date => appState.itinerary[date] && ((appState.itinerary[date].activities && appState.itinerary[date].activities.length) || (appState.itinerary[date].header && appState.itinerary[date].header.length) || (appState.itinerary[date].lodging && (appState.itinerary[date].lodging.start.city || appState.itinerary[date].lodging.end.city))));
+    let html = `<h2>Your Complete Travel Itinerary</h2>
+        <div class="action-row">
+            <button class="primary-btn" onclick="generateSampleItinerary()">🎯 Load Sample Itinerary</button>
+            <button class="clear-btn" onclick="clearItinerary()">🗑️ Clear All Itinerary</button>
+        </div>
+        <div style="background:#f8f9fa; padding:20px; border-radius:15px; margin-bottom:20px;">
+            <h3>Trip Overview</h3>
+            <p><strong>Start Date:</strong> ${new Date(appState.dates.start).toLocaleDateString()}</p>
+            <p><strong>End Date:</strong> ${new Date(appState.dates.end).toLocaleDateString()}</p>
+            <p><strong>Duration:</strong> ${dates.length} days</p>
+        </div>`;
+
+    dates.forEach(date => {
+        const dayData = appState.itinerary[date];
+        if (!dayData) return;
+        const dateObj = new Date(date);
+        html += `<div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px; border-left: 5px solid #007aff;">
+            <div class="flex-row" style="justify-content:space-between; align-items:flex-start; margin-bottom:12px; gap:10px;">
+                <div>
+                    <h3 style="color:#007aff; margin-top:0;">${dateObj.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'})}</h3>
+                    ${dayData.header ? `<h4 style="color:#34c759; margin:5px 0 0;">${dayData.header}</h4>` : ''}
+                </div>
+                <button class="small-btn" onclick="switchToDay('${date}')">Edit Day</button>
+            </div>`;
+
+        ['start', 'end'].forEach(type => {
+            const l = dayData.lodging[type];
+            if (l && (l.city || l.address)) {
+                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address || l.city)}`;
+                html += `<div style="background:#f0f0f0; padding:12px; border-radius:10px; margin-bottom:10px;">
+                    <b>${type.toUpperCase()} Lodging:</b> ${l.city || ''} ${l.time ? `(${l.time})` : ''}<br>
+                    ${l.address ? `📍 <a href="${mapUrl}" target="_blank" style="color:#007aff;">${l.address}</a>` : ''}
+                </div>`;
+            }
+        });
+
+        if (dayData.activities && dayData.activities.length > 0) {
+            html += `<h4>Activities</h4>`;
+            dayData.activities.forEach((act, idx) => {
+                let timeClass = "time-none";
+                if (act.time) {
+                    const hour = parseInt(act.time.split(':')[0]);
+                    if (hour < 12) timeClass = "time-morning";
+                    else if (hour < 17) timeClass = "time-afternoon";
+                    else timeClass = "time-evening";
+                }
+                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.location || act.event)}`;
+                html += `<div class="activity-card ${timeClass}" style="margin-bottom:10px;">
+                    <div class="card-header">
+                        <span class="event-title">${act.event}</span>
+                        <span class="time-text">${act.time || 'Anytime'}</span>
+                    </div>
+                    ${act.ticket ? `<div style="font-size:0.85rem; margin-top:4px;">🎫 <b>Ticket:</b> ${act.ticket}</div>` : ''}
+                    ${act.location ? `<div style="font-size:0.85rem; margin-top:4px;">📍 ${act.location}</div>` : ''}
+                    ${act.notes ? `<div style="font-size:0.85rem; margin-top:4px;">📝 ${act.notes}</div>` : ''}
+                </div>`;
+            });
+        }
+
+        const dailyTotal = (dayData.expenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
+        if (dailyTotal > 0) {
+            html += `<div style="text-align:right; font-weight:700; margin-top:15px; color:#34c759; padding:10px; border-top:1px solid #eee;">Day Expenses: $${dailyTotal.toFixed(2)}</div>`;
+        }
+        html += `</div>`;
+    });
+
+    let grandTotal = 0;
+    dates.forEach(date => {
+        const dayData = appState.itinerary[date];
+        if (dayData && dayData.expenses) {
+            dayData.expenses.forEach(exp => grandTotal += parseFloat(exp.amount || 0));
+        }
+    });
+    if (grandTotal > 0) {
+        html += `<div style="background:#34c759; color:white; padding:20px; border-radius:15px; text-align:center;">
+            <h3>Total Trip Expenses: $${grandTotal.toFixed(2)}</h3>
+        </div>`;
+    }
+
+    content.innerHTML = html;
+}
+
+function switchToDay(date) {
+    const dates = getDatesInRange();
+    appState.currentDateIndex = dates.indexOf(date);
+    appState.currentPage = 'itinerary';
+    appState.editMode = true;
+    renderCurrentPage();
+}
+
+function clearItinerary() {
+    if (!confirm('Clear all itinerary data? This cannot be undone.')) return;
+    appState.itinerary = {};
+    saveData();
+    renderCurrentPage();
+}
+
+function generateSampleItinerary() {
+    const dates = getDatesInRange();
+    const sampleData = {
+        "2026-05-04": {
+            header: "Arrival in Paris",
+            lodging: { start: { city: "Paris", time: "15:00", address: "Hotel Ritz Paris, 15 Place Vendôme" }, end: { city: "Paris", time: "11:00", address: "Hotel Ritz Paris, 15 Place Vendôme" } },
+            activities: [
+                { event: "Check into hotel", time: "15:00", ticket: "", location: "Hotel Ritz Paris", notes: "Rest after flight" },
+                { event: "Evening walk along Seine", time: "18:00", ticket: "", location: "Seine River", notes: "Enjoy the city lights" }
+            ],
+            expenses: [ { amount: 50, category: "Transport", description: "Taxi from airport" }, { amount: 300, category: "Lodging", description: "Hotel night" } ]
+        },
+        "2026-05-05": {
+            header: "Eiffel Tower Day",
+            lodging: { start: { city: "Paris", time: "08:00", address: "Hotel Ritz Paris" }, end: { city: "Paris", time: "23:00", address: "Hotel Ritz Paris" } },
+            activities: [
+                { event: "Visit Eiffel Tower", time: "10:00", ticket: "Online ticket", location: "Champ de Mars", notes: "Climb to the top" },
+                { event: "Lunch at nearby cafe", time: "13:00", ticket: "", location: "Café du Trocadéro", notes: "Try local pastries" },
+                { event: "Seine River cruise", time: "16:00", ticket: "Bateaux Parisiens", location: "Port de la Bourdonnais", notes: "Sunset cruise" }
+            ],
+            expenses: [ { amount: 80, category: "Activities", description: "Eiffel Tower tickets" }, { amount: 40, category: "Food", description: "Lunch" }, { amount: 25, category: "Activities", description: "River cruise" } ]
+        }
+    };
+    dates.forEach(date => {
+        if (sampleData[date]) appState.itinerary[date] = sampleData[date];
+    });
+    saveData();
+    renderCurrentPage();
+}
+
+function updateAct(index, field, value) {
+    const activeDate = getDatesInRange()[appState.currentDateIndex];
+    appState.itinerary[activeDate].activities[index][field] = value;
+    saveData();
+}
+
+function addActivity() {
+    const activeDate = getDatesInRange()[appState.currentDateIndex];
+    appState.itinerary[activeDate].activities.push({ event: '', time: '', ticket: '', location: '', notes: '' });
+    saveData();
+    renderCurrentPage();
+}
+
+function removeAct(index) {
+    const activeDate = getDatesInRange()[appState.currentDateIndex];
+    appState.itinerary[activeDate].activities.splice(index, 1);
+    saveData();
+    renderCurrentPage();
+}
+
+function renderItinerary(content) {
+
     let dates = [];
     let curr = new Date(appState.dates.start);
     let end = new Date(appState.dates.end);
@@ -205,21 +342,33 @@ function renderItinerary(content) {
                 
                 <h3>📋 Activities</h3>
                 <textarea id="excel-paste" placeholder="Paste from Excel..." oninput="parseExcelPaste(this.value)"></textarea>
-                <div id="edit-list">
-                    ${dayData.activities.map((a, i) => `
-                        <div class="activity-card" style="border-left: 4px solid #ccc; margin-top:10px; display:flex; justify-content:space-between; align-items:center;">
-                            <div style="flex-grow:1">
-                                <input type="text" value="${a.event}" onchange="updateAct(${i}, 'event', this.value)" style="font-weight:bold; margin-bottom:5px;">
-                                <input type="time" value="${a.time}" onchange="updateAct(${i}, 'time', this.value)">
-                            </div>
-                            <div class="controls">
-                                <button class="icon-btn" onclick="moveAct(${i}, -1)">▲</button>
-                                <button class="icon-btn" onclick="moveAct(${i}, 1)">▼</button>
-                                <button class="icon-btn" onclick="removeAct(${i})">🗑️</button>
-                            </div>
-                        </div>
-                    `).join('')}
+                <div style="overflow-x:auto; margin-top:10px;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Event</th>
+                                <th>Time</th>
+                                <th>Ticket</th>
+                                <th>Location</th>
+                                <th>Notes</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${dayData.activities.map((a, i) => `
+                                <tr>
+                                    <td><input class="table-input" type="text" value="${a.event}" onchange="updateAct(${i}, 'event', this.value)"></td>
+                                    <td><input class="table-input" type="time" value="${a.time}" onchange="updateAct(${i}, 'time', this.value)"></td>
+                                    <td><input class="table-input" type="text" value="${a.ticket}" onchange="updateAct(${i}, 'ticket', this.value)"></td>
+                                    <td><input class="table-input" type="text" value="${a.location}" onchange="updateAct(${i}, 'location', this.value)"></td>
+                                    <td><input class="table-input" type="text" value="${a.notes}" onchange="updateAct(${i}, 'notes', this.value)"></td>
+                                    <td><button class="icon-btn" onclick="removeAct(${i})">🗑️</button></td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
                 </div>
+                <button class="primary-btn" style="background:#8e8e93; font-size:0.9rem;" onclick="addActivity()">+ Add Activity</button>
 
                 <h3>💰 Daily Expenses</h3>
                 <div id="expense-edit-list">
@@ -276,335 +425,6 @@ function renderItinerary(content) {
     content.innerHTML = html;
 }
 
-// --- FULL ITINERARY RENDERING ---
-function renderFullItinerary(content) {
-    const dates = getDatesInRange();
-    let html = `<h2>Your Complete Travel Itinerary</h2>
-        <div style="margin-bottom:20px;">
-            <button class="primary-btn" onclick="generateSampleItinerary()">🎯 Generate Sample Itinerary</button>
-        </div>
-        <div style="background:#f8f9fa; padding:20px; border-radius:15px; margin-bottom:20px;">
-            <h3>Trip Overview</h3>
-            <p><strong>Start Date:</strong> ${new Date(appState.dates.start).toLocaleDateString()}</p>
-            <p><strong>End Date:</strong> ${new Date(appState.dates.end).toLocaleDateString()}</p>
-            <p><strong>Duration:</strong> ${dates.length} days</p>
-        </div>`;
-
-    dates.forEach(date => {
-        const dayData = appState.itinerary[date];
-        if (!dayData) return; // skip empty days
-
-        const dateObj = new Date(date);
-        html += `<div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px; border-left: 5px solid #007aff;">
-            <h3 style="color:#007aff; margin-top:0;">${dateObj.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'})}</h3>`;
-
-        if (dayData.header) {
-            html += `<h4 style="color:#34c759; margin-bottom:10px;">${dayData.header}</h4>`;
-        }
-
-        // Lodging
-        ['start', 'end'].forEach(type => {
-            const l = dayData.lodging[type];
-            if (l.city || l.address) {
-                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(l.address || l.city)}`;
-                html += `<div style="background:#f0f0f0; padding:10px; border-radius:8px; margin-bottom:10px;">
-                    <b>${type.toUpperCase()} Lodging:</b> ${l.city} (${l.time})<br>
-                    📍 <a href="${mapUrl}" target="_blank" style="color:#007aff;">${l.address || 'View Map'}</a>
-                </div>`;
-            }
-        });
-
-        // Activities
-        if (dayData.activities && dayData.activities.length > 0) {
-            html += `<h4>Activities:</h4>`;
-            dayData.activities.forEach(act => {
-                let timeClass = "time-none";
-                if (act.time) {
-                    const hour = parseInt(act.time.split(':')[0]);
-                    if (hour < 12) timeClass = "time-morning";
-                    else if (hour < 17) timeClass = "time-afternoon";
-                    else timeClass = "time-evening";
-                }
-                const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.location || act.event)}`;
-                html += `<div class="activity-card ${timeClass}" style="margin-bottom:10px;">
-                    <div class="card-header">
-                        <span class="event-title">${act.event}</span>
-                        <span class="time-text">${act.time || 'Anytime'}</span>
-                    </div>
-                    ${act.ticket ? `<div style="font-size:0.85rem; margin-top:4px;">🎫 <b>Ticket:</b> ${act.ticket}</div>` : ''}
-                    ${act.location ? `<div style="font-size:0.85rem; margin-top:4px;">📍 ${act.location}</div>` : ''}
-                    ${act.notes ? `<div style="font-size:0.85rem; margin-top:4px;">📝 ${act.notes}</div>` : ''}
-                </div>`;
-            });
-        }
-
-        // Expenses
-        const dailyTotal = (dayData.expenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
-        if (dailyTotal > 0) {
-            html += `<div style="text-align:right; font-weight:700; margin-top:15px; color:#34c759; padding:10px; border-top:1px solid #eee;">Day Expenses: $${dailyTotal.toFixed(2)}</div>`;
-        }
-
-        html += `</div>`;
-    });
-
-    // Overall total
-    let grandTotal = 0;
-    dates.forEach(date => {
-        const dayData = appState.itinerary[date];
-        if (dayData && dayData.expenses) {
-            dayData.expenses.forEach(exp => grandTotal += parseFloat(exp.amount || 0));
-        }
-    });
-    if (grandTotal > 0) {
-        html += `<div style="background:#34c759; color:white; padding:20px; border-radius:15px; text-align:center;">
-            <h3>Total Trip Expenses: $${grandTotal.toFixed(2)}</h3>
-        </div>`;
-    }
-
-    content.innerHTML = html;
-}
-
-function generateSampleItinerary() {
-    const dates = getDatesInRange();
-    const sampleData = {
-        "2026-05-04": {
-            header: "Arrival in Paris",
-            lodging: {
-                start: { city: "Paris", time: "15:00", address: "Hotel Ritz Paris, 15 Place Vendôme" },
-                end: { city: "Paris", time: "11:00", address: "Hotel Ritz Paris, 15 Place Vendôme" }
-            },
-            activities: [
-                { event: "Check into hotel", time: "15:00", location: "Hotel Ritz Paris", notes: "Rest after flight" },
-                { event: "Evening walk along Seine", time: "18:00", location: "Seine River", notes: "Enjoy the city lights" }
-            ],
-            expenses: [
-                { amount: 50, category: "Transport", description: "Taxi from airport" },
-                { amount: 300, category: "Lodging", description: "Hotel night" }
-            ]
-        },
-        "2026-05-05": {
-            header: "Eiffel Tower Day",
-            lodging: {
-                start: { city: "Paris", time: "08:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "23:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Visit Eiffel Tower", time: "10:00", ticket: "Online ticket", location: "Champ de Mars", notes: "Climb to the top" },
-                { event: "Lunch at nearby cafe", time: "13:00", location: "Café du Trocadéro" },
-                { event: "Seine River cruise", time: "16:00", ticket: "Bateaux Parisiens", location: "Port de la Bourdonnais" }
-            ],
-            expenses: [
-                { amount: 80, category: "Activities", description: "Eiffel Tower tickets" },
-                { amount: 40, category: "Food", description: "Lunch" },
-                { amount: 25, category: "Activities", description: "River cruise" }
-            ]
-        },
-        "2026-05-06": {
-            header: "Louvre Museum",
-            lodging: {
-                start: { city: "Paris", time: "09:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "22:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Explore Louvre Museum", time: "10:00", ticket: "Museum pass", location: "Rue de Rivoli", notes: "See Mona Lisa and Venus de Milo" },
-                { event: "Walk through Tuileries Garden", time: "15:00", location: "Jardin des Tuileries" },
-                { event: "Dinner in Le Marais", time: "19:00", location: "Le Marais district" }
-            ],
-            expenses: [
-                { amount: 60, category: "Activities", description: "Louvre tickets" },
-                { amount: 50, category: "Food", description: "Dinner" }
-            ]
-        },
-        "2026-05-07": {
-            header: "Montmartre & Sacré-Cœur",
-            lodging: {
-                start: { city: "Paris", time: "09:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "21:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Visit Sacré-Cœur Basilica", time: "11:00", location: "Montmartre", notes: "Beautiful views of Paris" },
-                { event: "Explore Montmartre artists", time: "13:00", location: "Place du Tertre" },
-                { event: "Moulin Rouge show", time: "20:00", ticket: "Evening show", location: "Boulevard de Clichy" }
-            ],
-            expenses: [
-                { amount: 30, category: "Activities", description: "Basilica entry" },
-                { amount: 100, category: "Activities", description: "Moulin Rouge tickets" }
-            ]
-        },
-        "2026-05-08": {
-            header: "Versailles Day Trip",
-            lodging: {
-                start: { city: "Paris", time: "08:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "20:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Train to Versailles", time: "09:00", location: "Gare Montparnasse" },
-                { event: "Tour Palace of Versailles", time: "10:30", ticket: "Palace ticket", location: "Place d'Armes, Versailles", notes: "Hall of Mirrors" },
-                { event: "Gardens and fountains", time: "14:00", location: "Versailles Gardens" },
-                { event: "Return to Paris", time: "17:00" }
-            ],
-            expenses: [
-                { amount: 15, category: "Transport", description: "Train tickets" },
-                { amount: 40, category: "Activities", description: "Palace entry" },
-                { amount: 25, category: "Food", description: "Lunch in Versailles" }
-            ]
-        },
-        "2026-05-09": {
-            header: "Free Day in Paris",
-            lodging: {
-                start: { city: "Paris", time: "10:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "18:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Shopping on Champs-Élysées", time: "11:00", location: "Champs-Élysées" },
-                { event: "Arc de Triomphe", time: "14:00", location: "Place Charles de Gaulle" },
-                { event: "Relax in park", time: "16:00", location: "Jardin du Luxembourg" }
-            ],
-            expenses: [
-                { amount: 100, category: "Shopping", description: "Souvenirs" },
-                { amount: 20, category: "Food", description: "Café snack" }
-            ]
-        },
-        "2026-05-10": {
-            header: "Seine River Cruise",
-            lodging: {
-                start: { city: "Paris", time: "09:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "19:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Bateaux Mouches cruise", time: "12:00", ticket: "Lunch cruise", location: "Port de la Conférence", notes: "Cruise with lunch" },
-                { event: "Visit Notre-Dame (exterior)", time: "16:00", location: "Île de la Cité" },
-                { event: "Latin Quarter exploration", time: "17:00", location: "Quartier Latin" }
-            ],
-            expenses: [
-                { amount: 80, category: "Activities", description: "Cruise with lunch" }
-            ]
-        },
-        "2026-05-11": {
-            header: "Art & Culture Day",
-            lodging: {
-                start: { city: "Paris", time: "09:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "20:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Musée d'Orsay", time: "10:00", ticket: "Museum pass", location: "Rue de Lille", notes: "Impressionist art" },
-                { event: "Café culture", time: "14:00", location: "Saint-Germain-des-Prés" },
-                { event: "Evening at Moulin Rouge", time: "19:00", ticket: "Show tickets", location: "Pigalle" }
-            ],
-            expenses: [
-                { amount: 50, category: "Activities", description: "Museum entry" },
-                { amount: 90, category: "Activities", description: "Show tickets" }
-            ]
-        },
-        "2026-05-12": {
-            header: "Paris Markets",
-            lodging: {
-                start: { city: "Paris", time: "10:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "18:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Visit flea market", time: "11:00", location: "Marché aux Puces de Clignancourt" },
-                { event: "Food market shopping", time: "14:00", location: "Marché des Enfants Rouges" },
-                { event: "Picnic in park", time: "16:00", location: "Parc des Buttes-Chaumont" }
-            ],
-            expenses: [
-                { amount: 40, category: "Shopping", description: "Market purchases" },
-                { amount: 30, category: "Food", description: "Market foods" }
-            ]
-        },
-        "2026-05-13": {
-            header: "Wine & Cheese Tour",
-            lodging: {
-                start: { city: "Paris", time: "09:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "19:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Wine tasting tour", time: "11:00", ticket: "Guided tour", location: "Latin Quarter", notes: "French wines" },
-                { event: "Cheese workshop", time: "14:00", location: "Fromagerie" },
-                { event: "Seine promenade", time: "17:00", location: "Quai de Conti" }
-            ],
-            expenses: [
-                { amount: 60, category: "Activities", description: "Wine tour" },
-                { amount: 40, category: "Food", description: "Cheese and wine" }
-            ]
-        },
-        "2026-05-14": {
-            header: "Fashion & Shopping",
-            lodging: {
-                start: { city: "Paris", time: "10:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "20:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Galeries Lafayette", time: "11:00", location: "Boulevard Haussmann" },
-                { event: "Fashion show viewing", time: "14:00", location: "Palais de Tokyo" },
-                { event: "Dinner at Michelin star", time: "19:00", location: "Le Meurice" }
-            ],
-            expenses: [
-                { amount: 150, category: "Shopping", description: "Fashion purchases" },
-                { amount: 200, category: "Food", description: "Fine dining" }
-            ]
-        },
-        "2026-05-15": {
-            header: "Day Trip to Giverny",
-            lodging: {
-                start: { city: "Paris", time: "07:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "21:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Train to Giverny", time: "08:00", location: "Gare Saint-Lazare" },
-                { event: "Visit Monet's Garden", time: "10:00", ticket: "Garden entry", location: "Giverny", notes: "Water lilies inspiration" },
-                { event: "Lunch in village", time: "13:00", location: "Giverny village" },
-                { event: "Return to Paris", time: "17:00" }
-            ],
-            expenses: [
-                { amount: 25, category: "Transport", description: "Train tickets" },
-                { amount: 20, category: "Activities", description: "Garden entry" },
-                { amount: 35, category: "Food", description: "Lunch" }
-            ]
-        },
-        "2026-05-16": {
-            header: "Paris Highlights",
-            lodging: {
-                start: { city: "Paris", time: "09:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "18:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Père Lachaise Cemetery", time: "10:00", location: "Boulevard de Ménilmontant", notes: "Famous graves" },
-                { event: "Belleville neighborhood", time: "13:00", location: "Belleville" },
-                { event: "Final Seine walk", time: "16:00", location: "Pont Neuf" }
-            ],
-            expenses: [
-                { amount: 10, category: "Activities", description: "Cemetery entry" }
-            ]
-        },
-        "2026-05-17": {
-            header: "Last Day Shopping",
-            lodging: {
-                start: { city: "Paris", time: "10:00", address: "Hotel Ritz Paris" },
-                end: { city: "Paris", time: "14:00", address: "Hotel Ritz Paris" }
-            },
-            activities: [
-                { event: "Last minute shopping", time: "11:00", location: "Champs-Élysées" },
-                { event: "Check out of hotel", time: "14:00" },
-                { event: "Depart for airport", time: "16:00", location: "Charles de Gaulle Airport" }
-            ],
-            expenses: [
-                { amount: 50, category: "Shopping", description: "Final souvenirs" },
-                { amount: 60, category: "Transport", description: "Airport transfer" }
-            ]
-        }
-    };
-
-    dates.forEach(date => {
-        if (sampleData[date]) {
-            appState.itinerary[date] = sampleData[date];
-        }
-    });
-
-    saveData();
-    renderCurrentPage();
-}
-
 // --- FINANCE LOGIC ---
 function renderBudget(content) {
     const dates = getDatesInRange();
@@ -630,6 +450,20 @@ function renderBudget(content) {
         <div style="background:#007aff; color:white; padding:20px; border-radius:15px; text-align:center; margin-bottom:20px;">
             <small>TOTAL SPENT</small>
             <h1 style="font-size:2.5rem; margin:0;">$${grandTotal.toFixed(2)}</h1>
+        </div>`;
+
+    html += `<h3>Edit Budget Categories</h3>
+        <div style="background:white; padding:15px; border-radius:12px; margin-bottom:20px;">
+            ${appState.budget.categories.map((cat, index) => `
+                <div class="flex-row" style="margin-bottom:10px;">
+                    <input class="table-input" type="text" value="${cat}" onchange="updateCategory(${index}, this.value)">
+                    <button class="icon-btn" onclick="removeCategory(${index})">✕</button>
+                </div>
+            `).join('')}
+            <div class="action-row">
+                <input class="table-input" type="text" id="new-category-name" placeholder="New category">
+                <button class="primary-btn" style="width:auto; flex-shrink:0;" onclick="addCategory()">Add Category</button>
+            </div>
         </div>`;
 
     html += `<h3>Breakdown</h3><div style="background:white; padding:15px; border-radius:12px; margin-bottom:20px;">`;
@@ -665,6 +499,47 @@ function updateExpense(index, field, value) {
 function removeExpense(index) {
     const activeDate = getDatesInRange()[appState.currentDateIndex];
     appState.itinerary[activeDate].expenses.splice(index, 1);
+    saveData();
+    renderCurrentPage();
+}
+
+function updateCategory(index, value) {
+    const oldName = appState.budget.categories[index];
+    const newName = value.trim() || oldName;
+    appState.budget.categories[index] = newName;
+    Object.values(appState.itinerary).forEach(day => {
+        if (day.expenses) {
+            day.expenses.forEach(exp => {
+                if (exp.category === oldName) exp.category = newName;
+            });
+        }
+    });
+    saveData();
+    renderCurrentPage();
+}
+
+function removeCategory(index) {
+    if (appState.budget.categories.length <= 1) return;
+    const removed = appState.budget.categories.splice(index, 1)[0];
+    const fallback = appState.budget.categories.includes('Other') ? 'Other' : (appState.budget.categories[0] || 'Other');
+    Object.values(appState.itinerary).forEach(day => {
+        if (day.expenses) {
+            day.expenses.forEach(exp => {
+                if (exp.category === removed) exp.category = fallback;
+            });
+        }
+    });
+    saveData();
+    renderCurrentPage();
+}
+
+function addCategory() {
+    const input = document.getElementById('new-category-name');
+    if (!input) return;
+    const category = input.value.trim();
+    if (!category || appState.budget.categories.includes(category)) return;
+    appState.budget.categories.push(category);
+    input.value = '';
     saveData();
     renderCurrentPage();
 }
