@@ -9,6 +9,7 @@ let appState = {
         profiles: {}, 
         selectedProfile: null 
     },
+    tickets: {}, // date -> [{name, data}]
     currentPage: 'itinerary',
     editMode: false,
     currentDateIndex: 0
@@ -110,16 +111,31 @@ function parseExcelPaste(text) {
         if (cols[0]) {
             appState.itinerary[activeDate].activities.push({
                 event: cols[0].trim(),
-                time: cols[1] ? cols[1].trim() : '',
+                time: cols[1] ? parseTime(cols[1].trim()) : '',
                 ticket: cols[2] ? cols[2].trim() : '',
                 location: cols[3] ? cols[3].trim() : '',
-                notes: cols[4] ? cols[4].trim() : ''
+                notes: cols[4] ? cols[4].trim() : '',
+                image: ''
             });
         }
     });
     document.getElementById('excel-paste').value = '';
     saveData();
     renderCurrentPage();
+}
+
+function parseTime(str) {
+    str = str.trim().toLowerCase();
+    const match = str.match(/(\d+):?(\d+)?\s*(am|pm)?/);
+    if (match) {
+        let hour = parseInt(match[1]);
+        const min = match[2] ? parseInt(match[2]) : 0;
+        const ampm = match[3];
+        if (ampm === 'pm' && hour < 12) hour += 12;
+        if (ampm === 'am' && hour === 12) hour = 0;
+        return `${hour.toString().padStart(2,'0')}:${min.toString().padStart(2,'0')}`;
+    }
+    return str; // fallback
 }
 
 function updateAct(index, field, value) {
@@ -303,7 +319,7 @@ function updateAct(index, field, value) {
 
 function addActivity() {
     const activeDate = getDatesInRange()[appState.currentDateIndex];
-    appState.itinerary[activeDate].activities.push({ event: '', time: '', ticket: '', location: '', notes: '' });
+    appState.itinerary[activeDate].activities.push({ event: '', time: '', ticket: '', location: '', notes: '', image: '' });
     saveData();
     renderCurrentPage();
 }
@@ -317,8 +333,8 @@ function removeAct(index) {
 
 function getDatesInRange() {
     let dates = [];
-    let curr = new Date(appState.dates.start);
-    let end = new Date(appState.dates.end);
+    let curr = new Date(appState.dates.start + 'T12:00:00');
+    let end = new Date(appState.dates.end + 'T12:00:00');
     while (curr <= end) {
         dates.push(curr.toISOString().split('T')[0]);
         curr.setDate(curr.getDate() + 1);
@@ -343,8 +359,9 @@ function renderItinerary(content) {
             </div>
             <button class="icon-btn" onclick="navDate(1)">➡️</button>
         </div>
-        <button class="primary-btn" onclick="toggleEditMode()" style="background:${appState.editMode ? '#34c759' : '#007aff'}">
-            ${appState.editMode ? '💾 Save Day' : '✏️ Edit Mode'}
+        <h2 style="color:#007aff; text-align:center; margin-top:5px;">${dayData.header || ''}</h2>
+        <button class="small-btn" onclick="toggleEditMode()" style="background:${appState.editMode ? '#34c759' : '#007aff'}; margin-bottom:20px;">
+            ${appState.editMode ? '💾 Save' : '✏️ Edit'}
         </button>
     `;
 
@@ -373,6 +390,7 @@ function renderItinerary(content) {
                                 <th>Ticket</th>
                                 <th>Location</th>
                                 <th>Notes</th>
+                                <th>Image</th>
                                 <th></th>
                             </tr>
                         </thead>
@@ -384,6 +402,7 @@ function renderItinerary(content) {
                                     <td><input class="table-input" type="text" value="${a.ticket}" onchange="updateAct(${i}, 'ticket', this.value)"></td>
                                     <td><input class="table-input" type="text" value="${a.location}" onchange="updateAct(${i}, 'location', this.value)"></td>
                                     <td><input class="table-input" type="text" value="${a.notes}" onchange="updateAct(${i}, 'notes', this.value)"></td>
+                                    <td><input type="file" accept="image/*" onchange="uploadImage(${i}, this)"></td>
                                     <td><button class="icon-btn" onclick="removeAct(${i})">🗑️</button></td>
                                 </tr>
                             `).join('')}
@@ -392,15 +411,22 @@ function renderItinerary(content) {
                 </div>
                 <button class="primary-btn" style="background:#8e8e93; font-size:0.9rem;" onclick="addActivity()">+ Add Activity</button>
 
+                <h3>🎫 Tickets</h3>
+                <input type="file" multiple accept="image/*,application/pdf" onchange="uploadTickets(this)">
+                ${appState.tickets[activeDate] ? appState.tickets[activeDate].map((t, idx) => `<div>${t.name} <button onclick="removeTicket(${idx})">Remove</button></div>`).join('') : ''}
+
                 <h3>💰 Daily Expenses</h3>
                 <div id="expense-edit-list">
                     ${(dayData.expenses || []).map((exp, i) => `
-                        <div class="flex-row" style="margin-bottom:10px; gap:5px;">
-                            <input type="number" value="${exp.amount}" onchange="updateExpense(${i}, 'amount', this.value)" style="width:70px;">
-                            <select onchange="updateExpense(${i}, 'category', this.value)" style="flex-grow:1;">
-                                ${appState.budget.categories.map(c => `<option value="${c}" ${exp.category === c ? 'selected' : ''}>${c}</option>`).join('')}
-                            </select>
-                            <button class="icon-btn" onclick="removeExpense(${i})">✕</button>
+                        <div style="margin-bottom:10px; padding:10px; border:1px solid #ddd; border-radius:8px;">
+                            <div class="flex-row" style="gap:5px; margin-bottom:5px;">
+                                <input type="number" value="${exp.amount}" onchange="updateExpense(${i}, 'amount', this.value)" style="width:70px;" placeholder="Amount">
+                                <select onchange="updateExpense(${i}, 'category', this.value)" style="flex-grow:1;">
+                                    ${appState.budget.categories.map(c => `<option value="${c}" ${exp.category === c ? 'selected' : ''}>${c}</option>`).join('')}
+                                </select>
+                            </div>
+                            <input type="text" value="${exp.location || ''}" onchange="updateExpense(${i}, 'location', this.value)" placeholder="Location (e.g., Restaurant name)">
+                            <button class="icon-btn" onclick="removeExpense(${i})" style="float:right;">✕</button>
                         </div>
                     `).join('')}
                     <button class="primary-btn" style="background:#8e8e93; font-size:0.8rem;" onclick="addExpense()">+ Add Expense</button>
@@ -420,7 +446,14 @@ function renderItinerary(content) {
             }
         });
 
-        dayData.activities.forEach(act => {
+        const sortedActivities = [...dayData.activities].sort((a, b) => {
+            if (!a.time && !b.time) return 0;
+            if (!a.time) return 1;
+            if (!b.time) return -1;
+            return a.time.localeCompare(b.time);
+        });
+
+        sortedActivities.forEach(act => {
             let timeClass = "time-none";
             if (act.time) {
                 const hour = parseInt(act.time.split(':')[0]);
@@ -431,13 +464,26 @@ function renderItinerary(content) {
             const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(act.location || act.event)}`;
             html += `<div class="activity-card ${timeClass}">
                 <div class="card-header">
-                    <span class="event-title">${act.event}</span>
                     <span class="time-text">${act.time || 'Anytime'}</span>
+                    <span class="event-title">${act.event}</span>
                 </div>
+                ${act.image ? `<img src="${act.image}" style="width:50px; height:50px; margin:5px; border-radius:5px;">` : ''}
                 ${act.ticket ? `<div style="font-size:0.85rem; margin-top:4px;">🎫 <b>Ticket:</b> ${act.ticket}</div>` : ''}
-                <div style="margin-top:8px;"><a href="${mapUrl}" target="_blank" style="text-decoration:none; font-size:0.85rem;">📍 View Map</a></div>
+                ${act.notes ? `<div style="font-size:0.85rem; margin-top:4px;">📝 ${act.notes}</div>` : ''}
+                <div style="margin-top:8px; text-align:right;"><a href="${mapUrl}" target="_blank" style="text-decoration:none; font-size:0.85rem;">📍 View Map</a></div>
             </div>`;
         });
+
+        // Show tickets if it's today
+        const today = new Date().toISOString().split('T')[0];
+        if (activeDate === today && appState.tickets[activeDate]) {
+            html += `<h4>🎫 Today's Tickets</h4>`;
+            appState.tickets[activeDate].forEach(ticket => {
+                html += `<div style="background:white; padding:10px; border-radius:8px; margin-bottom:10px;">
+                    <a href="${ticket.data}" target="_blank">${ticket.name}</a>
+                </div>`;
+            });
+        }
 
         const dailyTotal = (dayData.expenses || []).reduce((sum, exp) => sum + parseFloat(exp.amount || 0), 0);
         if (dailyTotal > 0) {
@@ -474,20 +520,6 @@ function renderBudget(content) {
             <h1 style="font-size:2.5rem; margin:0;">$${grandTotal.toFixed(2)}</h1>
         </div>`;
 
-    html += `<h3>Edit Budget Categories</h3>
-        <div style="background:white; padding:15px; border-radius:12px; margin-bottom:20px;">
-            ${appState.budget.categories.map((cat, index) => `
-                <div class="flex-row" style="margin-bottom:10px;">
-                    <input class="table-input" type="text" value="${cat}" onchange="updateCategory(${index}, this.value)">
-                    <button class="icon-btn" onclick="removeCategory(${index})">✕</button>
-                </div>
-            `).join('')}
-            <div class="action-row">
-                <input class="table-input" type="text" id="new-category-name" placeholder="New category">
-                <button class="primary-btn" style="width:auto; flex-shrink:0;" onclick="addCategory()">Add Category</button>
-            </div>
-        </div>`;
-
     html += `<h3>Breakdown</h3><div style="background:white; padding:15px; border-radius:12px; margin-bottom:20px;">`;
     for (const [cat, total] of Object.entries(categoryTotals)) {
         if (total > 0) {
@@ -501,13 +533,43 @@ function renderBudget(content) {
         }
     }
     html += `</div>`;
+
+    // Daily summary
+    html += `<h3>Daily Summary</h3><div style="background:white; padding:15px; border-radius:12px; margin-bottom:20px;">`;
+    dates.forEach(date => {
+        const dayTotal = dailyTotals[date] || 0;
+        if (dayTotal > 0) {
+            const dateObj = new Date(date);
+            html += `<div style="margin-bottom:10px;">
+                <div class="flex-row" style="justify-content:space-between;">
+                    <span>${dateObj.toLocaleDateString('en-US', {month:'short', day:'numeric'})}</span>
+                    <span>$${dayTotal.toFixed(2)}</span>
+                </div>
+            </div>`;
+        }
+    });
+    html += `</div>`;
+
+    html += `<h3>Edit Budget Categories</h3>
+        <div style="background:white; padding:15px; border-radius:12px; margin-bottom:20px;">
+            ${appState.budget.categories.map((cat, index) => `
+                <div class="flex-row" style="margin-bottom:10px;">
+                    <input class="table-input" type="text" value="${cat}" onchange="updateCategory(${index}, this.value)">
+                    <button class="icon-btn" onclick="removeCategory(${index})">✕</button>
+                </div>
+            `).join('')}
+            <div class="action-row">
+                <input class="table-input" type="text" id="new-category-name" placeholder="New category">
+                <button class="primary-btn" style="width:auto; flex-shrink:0;" onclick="addCategory()">Add Category</button>
+            </div>
+        </div>`;
     content.innerHTML = html;
 }
 
 function addExpense() {
     const activeDate = getDatesInRange()[appState.currentDateIndex];
     if (!appState.itinerary[activeDate].expenses) appState.itinerary[activeDate].expenses = [];
-    appState.itinerary[activeDate].expenses.push({ amount: 0, category: "Other", description: "" });
+    appState.itinerary[activeDate].expenses.push({ amount: 0, category: "Other", location: "", description: "" });
     saveData();
     renderCurrentPage();
 }
@@ -579,6 +641,7 @@ function renderPacking(content) {
             <div class="flex-row" style="margin-top:10px;">
                 <input type="text" id="new-profile-name" placeholder="Name..." style="flex-grow:1;">
                 <button class="primary-btn" onclick="addProfile()" style="margin:0; margin-left:10px;">Add</button>
+                ${packing.selectedProfile ? `<button class="clear-btn" onclick="deleteProfile()" style="margin:0; margin-left:10px;">Delete Profile</button>` : ''}
             </div>
         </div>`;
 
@@ -586,7 +649,7 @@ function renderPacking(content) {
         const items = packing.profiles[packing.selectedProfile].items || [];
         html += `<div style="background: white; padding: 15px; border-radius: 12px;">
             <h3>${packing.selectedProfile}'s List</h3>
-            <textarea id="packing-paste" placeholder="Paste items here..." oninput="parsePackingPaste(this.value)" style="width:100%; height:60px;"></textarea>
+            <textarea id="packing-paste" placeholder="Type items and press space to add..." oninput="handlePackingInput(this)" style="width:100%; height:60px;"></textarea>
             <div style="margin-top:15px;">
                 ${items.map((item, index) => `
                     <div class="flex-row" style="padding:10px 0; border-bottom:1px solid #eee; align-items:center;">
@@ -599,6 +662,46 @@ function renderPacking(content) {
         </div>`;
     }
     content.innerHTML = html;
+}
+
+function handlePackingInput(textarea) {
+    const value = textarea.value;
+    if (value.endsWith(' ')) {
+        const item = value.trim();
+        if (item) {
+            addPackingItem(item);
+            textarea.value = '';
+        }
+    } else {
+        // For paste, handle multiple lines
+        const lines = value.split('\n');
+        if (lines.length > 1) {
+            lines.forEach(line => {
+                const item = line.trim();
+                if (item) addPackingItem(item);
+            });
+            textarea.value = '';
+        }
+    }
+}
+
+function addPackingItem(name) {
+    const profile = appState.packing.selectedProfile;
+    if (profile) {
+        appState.packing.profiles[profile].items.push({ name, packed: false });
+        saveData();
+        renderCurrentPage();
+    }
+}
+
+function deleteProfile() {
+    const profile = appState.packing.selectedProfile;
+    if (profile && confirm(`Delete profile "${profile}"?`)) {
+        delete appState.packing.profiles[profile];
+        appState.packing.selectedProfile = null;
+        saveData();
+        renderCurrentPage();
+    }
 }
 
 function addProfile() {
@@ -638,6 +741,44 @@ function togglePacked(index) {
 function removePackingItem(index) {
     const profile = appState.packing.selectedProfile;
     appState.packing.profiles[profile].items.splice(index, 1);
+    saveData();
+    renderCurrentPage();
+}
+
+// --- TICKET AND IMAGE UPLOAD ---
+function uploadImage(index, input) {
+    const file = input.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const activeDate = getDatesInRange()[appState.currentDateIndex];
+            appState.itinerary[activeDate].activities[index].image = e.target.result;
+            saveData();
+            renderCurrentPage();
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function uploadTickets(input) {
+    const files = input.files;
+    const activeDate = getDatesInRange()[appState.currentDateIndex];
+    if (!appState.tickets[activeDate]) appState.tickets[activeDate] = [];
+    Array.from(files).forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            appState.tickets[activeDate].push({ name: file.name, data: e.target.result });
+            saveData();
+            renderCurrentPage();
+        };
+        reader.readAsDataURL(file);
+    });
+    input.value = '';
+}
+
+function removeTicket(index) {
+    const activeDate = getDatesInRange()[appState.currentDateIndex];
+    appState.tickets[activeDate].splice(index, 1);
     saveData();
     renderCurrentPage();
 }
