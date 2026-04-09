@@ -354,7 +354,7 @@ function renderItinerary(content) {
         <div class="flex-row" style="justify-content: space-between; margin-bottom: 20px;">
             <button class="icon-btn" onclick="navDate(-1)">⬅️</button>
             <div style="text-align:center">
-                <h2 style="margin:0">${new Date(activeDate).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</h2>
+                <h2 style="margin:0">${new Date(activeDate + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'})}</h2>
                 <small>${new Date(activeDate).toLocaleDateString('en-US', {weekday:'long'})}</small>
             </div>
             <button class="icon-btn" onclick="navDate(1)">➡️</button>
@@ -433,7 +433,6 @@ function renderItinerary(content) {
                 </div>
             </div>`;
     } else {
-        html += `<h2 style="color:#007aff; text-align:center; margin-top:5px;">${dayData.header || ''}</h2>`;
         
         ['start', 'end'].forEach(type => {
             const l = dayData.lodging[type];
