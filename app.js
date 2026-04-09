@@ -33,6 +33,11 @@ function loadData() {
     const req = tx.objectStore("tripData").get("mainState");
     req.onsuccess = () => {
         if (req.result) appState = req.result.state;
+        
+        // Add these two lines to populate the sidebar inputs!
+        document.getElementById('trip-start').value = appState.dates.start;
+        document.getElementById('trip-end').value = appState.dates.end;
+        
         renderCurrentPage();
     };
 }
@@ -49,7 +54,25 @@ function switchPage(page) {
     toggleMenu();
     renderCurrentPage();
 }
-
+function updateTripDates() {
+    const startInput = document.getElementById('trip-start').value;
+    const endInput = document.getElementById('trip-end').value;
+    
+    if (startInput && endInput) {
+        if (new Date(startInput) > new Date(endInput)) {
+            alert("Start date cannot be after the end date.");
+            return;
+        }
+        appState.dates.start = startInput;
+        appState.dates.end = endInput;
+        
+        // Reset to the first day of the new date range
+        appState.currentDateIndex = 0; 
+        
+        saveData();
+        renderCurrentPage();
+    }
+}
 function navDate(dir) {
     const dates = getDatesInRange();
     appState.currentDateIndex = Math.max(0, Math.min(dates.length - 1, appState.currentDateIndex + dir));
@@ -292,8 +315,7 @@ function removeAct(index) {
     renderCurrentPage();
 }
 
-function renderItinerary(content) {
-
+function getDatesInRange() {
     let dates = [];
     let curr = new Date(appState.dates.start);
     let end = new Date(appState.dates.end);
