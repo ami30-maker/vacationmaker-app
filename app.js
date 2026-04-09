@@ -355,11 +355,10 @@ function renderItinerary(content) {
             <button class="icon-btn" onclick="navDate(-1)">⬅️</button>
             <div style="text-align:center">
                 <h2 style="margin:0">${new Date(activeDate + 'T12:00:00').toLocaleDateString('en-US', {month:'short', day:'numeric'})}</h2>
-                <small>${new Date(activeDate).toLocaleDateString('en-US', {weekday:'long'})}</small>
+                <small>${new Date(activeDate + 'T12:00:00').toLocaleDateString('en-US', {weekday:'long'})}</small>
             </div>
             <button class="icon-btn" onclick="navDate(1)">➡️</button>
         </div>
-        <h2 style="color:#007aff; text-align:center; margin-top:5px;">${dayData.header || ''}</h2>
         <button class="small-btn" onclick="toggleEditMode()" style="background:${appState.editMode ? '#34c759' : '#007aff'}; margin-bottom:20px;">
             ${appState.editMode ? '💾 Save' : '✏️ Edit'}
         </button>
