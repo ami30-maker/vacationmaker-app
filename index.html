@@ -7,12 +7,39 @@
     <link rel="manifest" href="manifest.json">
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        // TODO: Replace with your Firebase config
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.firebaseApp = app;
+        window.db = db;
+        window.firestoreDoc = doc;
+        window.firestoreSetDoc = setDoc;
+        window.firestoreGetDoc = getDoc;
+        window.firestoreOnSnapshot = onSnapshot;
+    </script>
 </head>
 <body>
     <div id="overlay" onclick="toggleMenu()"></div>
     <aside id="sidebar">
         <button class="close-btn" onclick="toggleMenu()">✕</button>
         <h2>Trip Settings</h2>
+        <label>Trip ID (for sync):</label>
+        <input type="text" id="trip-id" placeholder="Enter shared trip ID" onchange="updateTripId()">
         <label>Start Date:</label>
         <input type="date" id="trip-start" onchange="updateTripDates()">
         <label>End Date:</label>

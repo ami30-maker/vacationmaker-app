@@ -1,5 +1,6 @@
 // --- STATE MANAGEMENT ---
 let appState = {
+    tripId: localStorage.getItem('tripId') || '',
     dates: { start: "2026-05-04", end: "2026-05-20" },
     itinerary: {},
     budget: { 
@@ -25,8 +26,16 @@ request.onupgradeneeded = (e) => {
 request.onsuccess = (e) => { db = e.target.result; loadData(); };
 
 function saveData() {
+    // Save to IndexedDB
     const tx = db.transaction("tripData", "readwrite");
     tx.objectStore("tripData").put({ id: "mainState", state: appState });
+
+    // Save to cloud if tripId
+    if (appState.tripId && window.db) {
+        const tripRef = window.firestoreDoc(window.db, 'trips', appState.tripId);
+        const { tripId, ...dataToSave } = appState; // Don't save tripId in cloud
+        window.firestoreSetDoc(tripRef, dataToSave);
+    }
 }
 
 function loadData() {
@@ -35,12 +44,38 @@ function loadData() {
     req.onsuccess = () => {
         if (req.result) appState = req.result.state;
         
-        // Add these two lines to populate the sidebar inputs!
+        // Set inputs
+        document.getElementById('trip-id').value = appState.tripId;
         document.getElementById('trip-start').value = appState.dates.start;
         document.getElementById('trip-end').value = appState.dates.end;
         
         renderCurrentPage();
+
+        // Start sync if tripId
+        if (appState.tripId && window.db) {
+            startSync();
+        }
     };
+}
+
+let unsubscribe = null;
+
+function startSync() {
+    if (unsubscribe) unsubscribe();
+    if (!appState.tripId || !window.db) return;
+    const tripRef = window.firestoreDoc(window.db, 'trips', appState.tripId);
+    unsubscribe = window.firestoreOnSnapshot(tripRef, (docSnap) => {
+        if (docSnap.exists()) {
+            const cloudData = docSnap.data();
+            // Update appState with cloud data, but keep local tripId
+            const localTripId = appState.tripId;
+            appState = { ...cloudData, tripId: localTripId };
+            // Save to local
+            const tx = db.transaction("tripData", "readwrite");
+            tx.objectStore("tripData").put({ id: "mainState", state: appState });
+            renderCurrentPage();
+        }
+    });
 }
 
 // --- NAVIGATION ---
@@ -55,23 +90,12 @@ function switchPage(page) {
     toggleMenu();
     renderCurrentPage();
 }
-function updateTripDates() {
-    const startInput = document.getElementById('trip-start').value;
-    const endInput = document.getElementById('trip-end').value;
-    
-    if (startInput && endInput) {
-        if (new Date(startInput) > new Date(endInput)) {
-            alert("Start date cannot be after the end date.");
-            return;
-        }
-        appState.dates.start = startInput;
-        appState.dates.end = endInput;
-        
-        // Reset to the first day of the new date range
-        appState.currentDateIndex = 0; 
-        
-        saveData();
-        renderCurrentPage();
+function updateTripId() {
+    const newId = document.getElementById('trip-id').value.trim();
+    appState.tripId = newId;
+    localStorage.setItem('tripId', newId);
+    if (newId && window.db) {
+        startSync();
     }
 }
 function navDate(dir) {
