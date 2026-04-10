@@ -16,12 +16,12 @@
         import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
 
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT.appspot.com",
-            messagingSenderId: "YOUR_SENDER_ID",
-            appId: "YOUR_APP_ID"
+            apiKey: "AIzaSyAiSZlxEUWOP8W96HdY9xIwx2_V2zToAqA",
+            authDomain: "travel-app-ddc3e.firebaseapp.com",
+            projectId: "travel-app-ddc3e",
+            storageBucket: "travel-app-ddc3e.firebasestorage.app",
+            messagingSenderId: "626492213065",
+            appId: "1:626492213065:web:d6b682f66927f946763c98"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -51,8 +51,9 @@
         window.signOut = signOut;
         window.onAuthStateChanged = onAuthStateChanged;
     </script>
+    <script src="app.js"></script>
 </head>
-<body>
+<body onload="initializeApp()">
     <!-- Auth Screen -->
     <div id="auth-screen" class="full-screen">
         <div class="auth-container">
@@ -61,8 +62,8 @@
                 <p>Plan trips. Collaborate. Explore.</p>
             </div>
             <div id="auth-form-container">
-                <input type="email" id="auth-email" placeholder="Email" />
-                <input type="password" id="auth-password" placeholder="Password" />
+                <input type="email" id="auth-email" placeholder="Email address" required />
+                <input type="password" id="auth-password" placeholder="Password (min 6 characters)" minlength="6" required />
                 <button class="primary-btn" onclick="handleSignUp()">Create Account</button>
                 <button class="secondary-btn" onclick="handleSignIn()">Sign In</button>
                 <button class="google-btn" onclick="handleGoogleSignIn()">

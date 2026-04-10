@@ -26,22 +26,50 @@ dbRequest.onupgradeneeded = (e) => {
 };
 dbRequest.onsuccess = (e) => { db = e.target.result; };
 
-// === AUTH FLOWS ===
-window.onAuthStateChanged(window.auth, async (user) => {
-    if (user) {
-        currentUser = user;
-        appState.userId = user.uid;
-        showAppScreen();
-        loadUserData();
-        loadUserTrips();
-        document.getElementById('user-email').textContent = user.email;
-        if (user.photoURL) {
-            document.getElementById('user-avatar').src = user.photoURL;
-        }
-    } else {
-        showAuthScreen();
+// === APP INITIALIZATION ===
+function initializeApp() {
+    console.log('Initializing VacationMaker app...');
+
+    // Check if Firebase is properly loaded
+    if (!window.auth) {
+        console.error('Firebase auth not initialized');
+        showToast('App initialization error. Please refresh the page.', 'error');
+        return;
     }
-});
+
+    console.log('Firebase initialized successfully');
+    console.log('Firebase auth object:', window.auth);
+    console.log('Firebase config check - project ID:', window.firebaseApp?.options?.projectId);
+
+    // Test Firebase connection
+    try {
+        console.log('Testing Firebase auth state...');
+        // This should trigger the auth state listener
+    } catch (error) {
+        console.error('Firebase test error:', error);
+    }
+
+    // Set up authentication state listener
+    window.onAuthStateChanged(window.auth, async (user) => {
+        console.log('Auth state changed:', user ? `signed in as ${user.email}` : 'signed out');
+        if (user) {
+            currentUser = user;
+            appState.userId = user.uid;
+            showAppScreen();
+            loadUserData();
+            loadUserTrips();
+            document.getElementById('user-email').textContent = user.email;
+            if (user.photoURL) {
+                document.getElementById('user-avatar').src = user.photoURL;
+            } else {
+                // Set default avatar
+                document.getElementById('user-avatar').src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=007bff&color=fff&size=40`;
+            }
+        } else {
+            showAuthScreen();
+        }
+    });
+}
 
 function showAuthScreen() {
     document.getElementById('auth-screen').style.display = 'flex';
@@ -54,40 +82,116 @@ function showAppScreen() {
 }
 
 async function handleSignUp() {
-    const email = document.getElementById('auth-email').value;
-    const password = document.getElementById('auth-password').value;
-    
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
+
+    console.log('Sign up attempt:', { email: email ? 'provided' : 'empty', password: password ? 'provided' : 'empty' });
+
     if (!email || !password) {
         showToast('Please enter email and password', 'error');
         return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showToast('Please enter a valid email address', 'error');
+    if (password.length < 6) {
+        showToast('Password must be at least 6 characters long', 'error');
+        return;
+    }
+
     try {
         showLoadingSpinner(true);
-        await window.createUserWithEmailAndPassword(window.auth, email, password);
+        console.log('Calling Firebase createUserWithEmailAndPassword...');
+        const userCredential = await window.createUserWithEmailAndPassword(window.auth, email, password);
+        console.log('Firebase signup successful:', userCredential.user.email);
+        document.getElementById('auth-email').value = '';
+        document.getElementById('auth-password').value = '';
         showToast('Account created successfully!', 'success');
     } catch (error) {
-        showToast('Error: ' + error.message, 'error');
+        console.error('Sign up error:', error.code, error.message);
+
+        // Handle specific Firebase errors
+        let errorMessage = 'Error creating account';
+        switch (error.code) {
+            case 'auth/email-already-in-use':
+                errorMessage = 'An account with this email already exists. Try signing in instead.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Please enter a valid email address.';
+                break;
+            case 'auth/weak-password':
+                errorMessage = 'Password is too weak. Please choose a stronger password.';
+                break;
+            case 'auth/network-request-failed':
+                errorMessage = 'Network error. Please check your internet connection.';
+                break;
+            case 'auth/operation-not-allowed':
+                errorMessage = 'Email/password authentication is not enabled in Firebase. Please enable it in the Firebase Console under Authentication > Sign-in method.';
+                break;
+            default:
+                errorMessage = 'Error: ' + error.message;
+        }
+
+        showToast(errorMessage, 'error');
     } finally {
         showLoadingSpinner(false);
     }
 }
 
 async function handleSignIn() {
-    const email = document.getElementById('auth-email').value;
-    const password = document.getElementById('auth-password').value;
-    
+    const email = document.getElementById('auth-email').value.trim();
+    const password = document.getElementById('auth-password').value.trim();
+
+    console.log('Sign in attempt:', { email: email ? 'provided' : 'empty', password: password ? 'provided' : 'empty' });
+
     if (!email || !password) {
         showToast('Please enter email and password', 'error');
         return;
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showToast('Please enter a valid email address', 'error');
     try {
         showLoadingSpinner(true);
-        await window.signInWithEmailAndPassword(window.auth, email, password);
+        console.log('Calling Firebase signInWithEmailAndPassword...');
+        const userCredential = await window.signInWithEmailAndPassword(window.auth, email, password);
+        console.log('Firebase signin successful:', userCredential.user.email);
+        document.getElementById('auth-email').value = '';
+        document.getElementById('auth-password').value = '';
         showToast('Signed in successfully!', 'success');
     } catch (error) {
-        showToast('Error: ' + error.message, 'error');
+        console.error('Sign in error:', error.code, error.message);
+
+        // Handle specific Firebase errors
+        let errorMessage = 'Error signing in';
+        switch (error.code) {
+            case 'auth/user-not-found':
+                errorMessage = 'No account found with this email. Please create an account first.';
+                break;
+            case 'auth/wrong-password':
+                errorMessage = 'Incorrect password. Please try again.';
+                break;
+            case 'auth/invalid-email':
+                errorMessage = 'Please enter a valid email address.';
+                break;
+            case 'auth/user-disabled':
+                errorMessage = 'This account has been disabled. Please contact support.';
+                break;
+            case 'auth/network-request-failed':
+                errorMessage = 'Network error. Please check your internet connection.';
+                break;
+            case 'auth/too-many-requests':
+                errorMessage = 'Too many failed attempts. Please try again later.';
+                break;
+            default:
+                errorMessage = 'Error: ' + error.message;
+        }
+
+        showToast(errorMessage, 'error');
     } finally {
         showLoadingSpinner(false);
     }
@@ -96,11 +200,37 @@ async function handleSignIn() {
 async function handleGoogleSignIn() {
     try {
         showLoadingSpinner(true);
+        console.log('Starting Google sign-in...');
         const provider = new window.GoogleAuthProvider();
-        await window.signInWithPopup(window.auth, provider);
+        console.log('Google provider created');
+        const userCredential = await window.signInWithPopup(window.auth, provider);
+        console.log('Google sign-in successful:', userCredential.user.email);
         showToast('Signed in with Google!', 'success');
     } catch (error) {
-        showToast('Error: ' + error.message, 'error');
+        console.error('Google sign-in error:', error.code, error.message);
+
+        let errorMessage = 'Error signing in with Google';
+        switch (error.code) {
+            case 'auth/popup-blocked':
+                errorMessage = 'Popup was blocked. Please allow popups for this site.';
+                break;
+            case 'auth/popup-closed-by-user':
+                errorMessage = 'Sign-in cancelled.';
+                break;
+            case 'auth/cancelled-popup-request':
+                errorMessage = 'Another popup is already open.';
+                break;
+            case 'auth/network-request-failed':
+                errorMessage = 'Network error. Please check your internet connection.';
+                break;
+            case 'auth/operation-not-allowed':
+                errorMessage = 'Google sign-in is not enabled in Firebase. Please enable it in the Firebase Console.';
+                break;
+            default:
+                errorMessage = 'Error: ' + error.message;
+        }
+
+        showToast(errorMessage, 'error');
     } finally {
         showLoadingSpinner(false);
     }
@@ -375,9 +505,9 @@ function renderFullItinerary(content) {
         html += `<div style="background:white; padding:20px; border-radius:15px; margin-bottom:20px; border-left: 5px solid #007aff;">
             <div class="flex-row" style="justify-content:space-between; align-items:flex-start; gap:10px;">
                 <div>
-                    <h3 style="color:#007aff; margin-top:0;">${dateObj.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'})}</h3>
-                    <p style="margin:5px 0; color:#666; font-size:0.9rem;">Daily Schedule</p>
-                    ${dayData.header ? `<h4 style="color:#34c759; margin:5px 0 0;">${dayData.header}</h4>` : ''}
+                    <h3 style="color:#007aff; margin-top:0; font-weight:700;">${dateObj.toLocaleDateString('en-US', {weekday:'long', month:'short', day:'numeric'})}</h3>
+                    <div style="background: linear-gradient(90deg, #007aff, #5ac8fa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; font-weight:600; font-size:0.95rem; margin:8px 0 12px 0;">📅 Daily Schedule</div>
+                    ${dayData.header ? `<h4 style="color:#34c759; margin:5px 0 0; font-weight:600; font-style:italic;">"${dayData.header}"</h4>` : ''}
                 </div>
                 <button class="small-btn" onclick="switchToDay('${date}')">Edit Day</button>
             </div>`;
@@ -612,22 +742,52 @@ function clearItinerary() {
 
 function generateSampleItinerary() {
     const dates = getDatesInRange();
+    if (dates.length === 0) return;
+    
+    // Use the first date of the trip for sample data
+    const firstDate = dates[0];
     const sampleData = {
-        "2026-05-04": {
-            header: "Arrival",
+        [firstDate]: {
+            header: "Arrival Day",
             lodging: { start: { city: "Paris", time: "15:00" }, end: { city: "Paris", time: "11:00" } },
             activities: [
-                { event: "Check in", time: "15:00", ticket: "", location: "Hotel", notes: "" },
-                { event: "Dinner", time: "19:00", ticket: "", location: "Restaurant", notes: "" }
+                { event: "Check into hotel", time: "15:00", ticket: "", location: "Hotel Ritz Paris", notes: "Rest after flight" },
+                { event: "Evening walk along Seine", time: "18:00", ticket: "", location: "Seine River", notes: "Enjoy the city lights" },
+                { event: "Dinner at local restaurant", time: "19:30", ticket: "", location: "Café Central", notes: "Try authentic local cuisine" }
             ],
-            expenses: []
+            expenses: [
+                { amount: 50, category: "Transport", location: "Airport Taxi" },
+                { amount: 300, category: "Lodging", location: "Hotel Ritz Paris" },
+                { amount: 45, category: "Food", location: "Café Central" }
+            ]
         }
     };
+    
+    // Add sample data for additional days if trip is longer
+    if (dates.length > 1) {
+        const secondDate = dates[1];
+        sampleData[secondDate] = {
+            header: "City Exploration",
+            lodging: { start: { city: "Paris", time: "08:00" }, end: { city: "Paris", time: "23:00" } },
+            activities: [
+                { event: "Visit Eiffel Tower", time: "10:00", ticket: "Online ticket", location: "Champ de Mars", notes: "Climb to the top for panoramic views" },
+                { event: "Lunch at nearby café", time: "13:00", ticket: "", location: "Café du Trocadéro", notes: "Try local pastries and coffee" },
+                { event: "Seine River cruise", time: "16:00", ticket: "Bateaux Parisiens", location: "Port de la Bourdonnais", notes: "Sunset cruise with commentary" }
+            ],
+            expenses: [
+                { amount: 80, category: "Activities", location: "Eiffel Tower" },
+                { amount: 40, category: "Food", location: "Café du Trocadéro" },
+                { amount: 25, category: "Activities", location: "Seine River Cruise" }
+            ]
+        };
+    }
+    
     dates.forEach(date => {
         if (sampleData[date]) appState.itinerary[date] = sampleData[date];
     });
     saveTripData();
     renderCurrentPage();
+    showToast('Sample itinerary loaded!', 'success');
 }
 
 function parseExcelPaste(text) {
